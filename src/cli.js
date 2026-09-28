@@ -7,7 +7,7 @@ import http from "node:http";
 import os from "node:os";
 import path from "node:path";
 
-import { AGENTS_MD_SECTION, CODEX_SKILL_MD, CURSOR_RULE_MDC, PLAN_TEMPLATE, SKILL_MD, helpText, openNextStep } from "./guidance.js";
+import { AGENTS_MD_SECTION, CODEX_SKILL_MD, CURSOR_RULE_MDC, CURSOR_SKILL_MD, OPENCODE_SKILL_MD, PLAN_TEMPLATE, SKILL_MD, helpText, openNextStep } from "./guidance.js";
 import { boardDir, canonicalPlanPath, defaultHost, defaultPort, ensureDir, planKey, readJson, serverInfoPath, serverLogPath, stateRoot } from "./paths.js";
 import { exportMarkdown } from "./export.js";
 import { STATUSES, STATUS_LABEL, lint, normalizeStatus, parsePlan, setItemStatus } from "./plan.js";
@@ -457,10 +457,10 @@ function cmdSetupCursor(flags) {
   const root = flags.global ? path.join(os.homedir(), ".cursor") : path.join(process.cwd(), ".cursor");
   const skillDir = path.join(root, "skills", "planboard");
   ensureDir(skillDir);
-  fs.writeFileSync(path.join(skillDir, "SKILL.md"), SKILL_MD);
-  const lines = [`wrote ${path.join(skillDir, "SKILL.md")}`];
+  fs.writeFileSync(path.join(skillDir, "SKILL.md"), CURSOR_SKILL_MD);
+  const lines = [`wrote ${path.join(skillDir, "SKILL.md")}`, `In Agent chat, type / and select planboard, or ask Cursor to use the planboard skill. Restart Cursor if it does not appear.`];
   if (flags.global) {
-    lines.push(`Cursor keeps global rules in Settings › Rules; run \`planboard setup cursor\` inside a project to add a project rule, or paste this rule there:`);
+    lines.push(`Cursor keeps global rules in Customize › Rules (Settings › Rules in older versions); run \`planboard setup cursor\` inside a project to add a project rule, or paste this rule there:`);
     lines.push(CURSOR_RULE_MDC.trimEnd());
   } else {
     const rulesDir = path.join(root, "rules");
@@ -492,11 +492,30 @@ function cmdSetupCodex(flags) {
   out(`wrote ${skillPath}\nUse $planboard in Codex CLI or the IDE extension, or select the planboard skill in the app.\nIf it does not appear, restart Codex. Existing AGENTS.md instructions are unchanged.`);
 }
 
+function cmdSetupOpenCode(flags) {
+  if (flags.hook || flags["agents-md"]) {
+    throw new CliError("setup opencode supports --global; keep project instructions in AGENTS.md and use the planboard skill for the review loop");
+  }
+  const xdgConfigHome = process.env.XDG_CONFIG_HOME;
+  const configHome = xdgConfigHome && path.isAbsolute(xdgConfigHome)
+    ? xdgConfigHome
+    : path.join(os.homedir(), ".config");
+  const root = flags.global
+    ? process.env.OPENCODE_CONFIG_DIR || path.join(configHome, "opencode")
+    : path.join(process.cwd(), ".opencode");
+  const skillDir = path.join(root, "skills", "planboard");
+  ensureDir(skillDir);
+  const skillPath = path.join(skillDir, "SKILL.md");
+  fs.writeFileSync(skillPath, OPENCODE_SKILL_MD);
+  out(`wrote ${skillPath}\nAsk OpenCode to use the planboard skill; it loads through the native skill tool.\nIf it does not appear, restart OpenCode and check skill permissions. Existing AGENTS.md instructions and OpenCode configuration are unchanged.`);
+}
+
 function cmdSetup(positional, flags) {
   const target = positional[0] || "claude";
   if (target === "cursor") return cmdSetupCursor(flags);
   if (target === "codex") return cmdSetupCodex(flags);
-  if (target !== "claude") throw new CliError(`unknown setup target "${target}" (use "claude", "cursor" or "codex")`);
+  if (target === "opencode") return cmdSetupOpenCode(flags);
+  if (target !== "claude") throw new CliError(`unknown setup target "${target}" (use "claude", "cursor", "codex" or "opencode")`);
   const root = flags.global ? path.join(os.homedir(), ".claude") : path.join(process.cwd(), ".claude");
   const skillDir = path.join(root, "skills", "planboard");
   ensureDir(skillDir);

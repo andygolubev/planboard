@@ -34,8 +34,9 @@ export const WORKFLOW = `Review loop
   2. Run \`planboard poll <PLAN.md> --owner "<your model>, effort <level>"\` and
      wait. Start it as a tracked background job when your harness has one (Claude
      Code: run_in_background) so you can keep working and are woken when notes
-     arrive; otherwise use a bounded foreground poll (Codex: \`--timeout 30\`) and re-run
-     on {"status":"waiting"}. The board shows the owner label next to
+     arrive; otherwise use a bounded foreground poll (Codex, Cursor, OpenCode:
+     \`--timeout 30\`) and re-run on {"status":"waiting"}.
+     The board shows the owner label next to
      "agent is listening", so the user knows which model and effort will read
      their notes. The poll returns when the user sends notes: each note carries
      its anchor (item / section / diagram node / image / quoted text), its depth,
@@ -91,9 +92,12 @@ Commands
   planboard setup claude [--global] [--hook]
                                        install the Claude Code skill (project or ~/.claude); --hook adds a SessionStart hook
   planboard setup cursor [--global] [--agents-md]
-                                       install the same guidance for Cursor (.cursor/skills + .cursor/rules; --agents-md appends to AGENTS.md)
+                                       install the Cursor skill (.cursor/skills + project .cursor/rules; --agents-md appends to AGENTS.md)
   planboard setup codex [--global]
                                        install the Codex skill in .agents/skills (project or home); preserves AGENTS.md
+  planboard setup opencode [--global]
+                                       install the OpenCode skill in .opencode/skills (global: ~/.config/opencode/skills); preserves AGENTS.md and configuration
+                                       global installs respect XDG_CONFIG_HOME and OPENCODE_CONFIG_DIR
   planboard server | stop              run the local server in the foreground | stop it
 
 Poll output (JSON on stdout)
@@ -107,8 +111,12 @@ Poll output (JSON on stdout)
   plan is refused (exit 3) unless --takeover is passed.
   Claude Code: use a tracked background poll (run_in_background), or --timeout 540.
   Codex: use --timeout 30; if the shell yields a session id, collect that session
-  until it exits before starting another poll. Re-run on "waiting" during an
-  active review; do not expect a detached process to wake an ended turn.
+  until it exits before starting another poll.
+  Cursor and OpenCode: use --timeout 30 in the foreground, within the shell tool's
+  time limit. Collect any tracked command's output before starting another poll.
+  Re-run on "waiting" during an active review; do not expect a detached process
+  to wake an ended turn.
+  Stop on "replaced" or "closed". Use --takeover only for an intended handoff.
 
 State
   <stem>.board/ beside the plan holds notes.json (the conversation), events.jsonl
@@ -152,45 +160,9 @@ export function feedbackNextStep(planPath, notes) {
     `flip statuses with \`planboard set ${planPath} <item-id> <status>\`, and reply to each with ` +
     `\`planboard reply ${planPath} --to <note-id> "<short answer>"\` so the answer appears next to the item. ` +
     (hints.length ? `Depth and attachments: ${hints.join("; ")}. ` : "") +
-    `Then run \`planboard poll ${planPath} --owner "<your model>, effort <level>"\` again (Codex: --timeout 30, collect any yielded shell session before re-polling). Do not repeat the answers in chat.`
+    `Then run \`planboard poll ${planPath} --owner "<your model>, effort <level>"\` again (Codex, Cursor, OpenCode: --timeout 30; collect any tracked command's output before re-polling). Do not repeat the answers in chat.`
   );
 }
-
-export const SKILL_MD = `---
-name: planboard
-description: Review and drive a project plan on a live whiteboard-style board with the user. Use when the user asks for a plan, wants to discuss or track a plan item by item, says "open the board" or "planboard", or when a task is long enough that progress should be visible outside the chat.
----
-
-# planboard
-
-A Markdown plan (PLAN.md with checkbox items and {#id} anchors) rendered as a live
-board. The user clicks items, diagram nodes or images and leaves notes; you receive
-them with \`planboard poll\`, edit the plan file, and answer with \`planboard reply\`.
-
-Current guidance lives in the CLI, not in this file:
-
-- \`planboard --help\` for the commands, the PLAN.md conventions, note depths and the review loop
-- \`planboard show <PLAN.md>\` to see a plan the way the board does, with ids and note counts
-- \`planboard thread <PLAN.md> <id>\` to read what was already discussed about an item
-- \`planboard export <PLAN.md>\` to write the plan with all threads as one Markdown file
-
-Typical session: \`planboard init PLAN.md\` (or edit an existing one) → \`planboard PLAN.md\`
-→ \`planboard poll PLAN.md --owner "<model>, effort <level>"\` → act, \`planboard set\` /
-\`planboard reply\` → poll again. Run the poll as a tracked background command (Claude Code:
-run_in_background) so you keep working and are woken when notes arrive; if you must run it in
-the foreground, pass \`--timeout 540\` and re-run on \`{"status":"waiting"}\`. The owner label is
-shown on the board, so the user knows which model and effort will read their notes. Each note
-carries a depth (quick · normal · deep) that says how hard to work on it, and may carry
-attachments (screenshots, whiteboard sketches) - look at them before answering.
-
-## Request
-
-$ARGUMENTS
-
-If the request above is non-empty, the user invoked /planboard explicitly: create or
-update the plan they mean, open the board, and start polling. If it is empty, infer
-which plan from the conversation (\`planboard boards\` lists known ones).
-`;
 
 export const PLAN_TEMPLATE = (title) => `---
 title: ${title}
@@ -250,11 +222,13 @@ Current guidance lives in the CLI, not in this file:
 - \`planboard thread <PLAN.md> <id>\` to read what was already discussed about an item
 - \`planboard export <PLAN.md>\` to write the plan with all threads as one Markdown file
 
-Typical session: \`planboard init PLAN.md\` (or edit an existing one) → \`planboard PLAN.md\`
-→ \`planboard poll PLAN.md --owner "<model>, effort <level>"\` → act, \`planboard set\` /
-\`planboard reply\` → poll again. If your tool limits command duration, pass \`--timeout 540\`
-and re-run on \`{"status":"waiting"}\`. Notes carry a depth (quick · normal · deep) and may
-carry attachments (screenshots, whiteboard sketches) - look at them before answering.
+Use the planboard skill for the full review loop. Poll with
+\`planboard poll PLAN.md --timeout 30 --owner "Cursor"\` in the foreground, shortening
+the timeout if needed to fit the terminal tool's limit. Collect any tracked command's
+output before starting another poll. On \`feedback\`, read each note's thread, depth
+and attachments, edit the plan, update statuses, and reply to every note. Re-poll on
+\`waiting\` during the active review; stop on \`replaced\`, \`closed\`, or when the user
+ends the review. A detached process does not keep an ended turn listening.
 `;
 
 export const AGENTS_MD_SECTION = `
@@ -267,14 +241,17 @@ waits for the user's notes; answer with \`planboard reply\`, flip statuses with 
 \`planboard export PLAN.md\` writes the plan with all threads for project records.
 `;
 
-// Codex discovers .agents/skills at project and home scope. Keep its terminal
-// lifecycle separate from Claude Code's background jobs and argument expansion.
-export const CODEX_SKILL_MD = `---
+// Share the board workflow, but keep each host's command lifecycle and invocation
+// syntax explicit. Packaged SKILL.md files mirror these installer payloads.
+function reviewSkill(host, polling, request = "", listenerEnd = `If the turn must end, explain
+   that listening has stopped and how to resume; a skill does not keep ${host}
+   running after the turn ends.`) {
+  return `---
 name: planboard
 description: Review a Markdown plan with the user on a live Planboard board. Use when the user asks to open a board, discuss plan items, or handle Planboard notes.
 ---
 
-# planboard for Codex
+# planboard for ${host}
 
 Run \`planboard --help\` for the current command contract and plan conventions.
 Use the plan named by the user; \`planboard boards\` lists known boards. Create a
@@ -288,13 +265,7 @@ for starting the server, loopback access, and browser launch.
 
 During an active review:
 
-1. Run \`planboard poll PLAN.md --timeout 30 --owner "Codex"\`. Use the known
-   model and effort in the label only if available; do not guess them.
-2. Wait for that command's JSON. If the shell tool yields a session id, collect
-   its output with the available session wait/input tool until it exits. Do not
-   start another poll while it is running. A bounded foreground command works
-   when resumable shell sessions are unavailable; shorten the timeout to fit
-   the tool's limit. Do not detach the poll with \`&\` or assume automatic wakeups.
+${polling}
 3. On \`feedback\`, read every note's thread and quick/normal/deep depth. Inspect
    attached images; use sketch feedback to update the plan's Mermaid source.
    Edit PLAN.md directly; the board refreshes on save. Use
@@ -306,11 +277,59 @@ During an active review:
 5. On \`waiting\`, re-poll while the requested review is active, checking user
    steering between calls. On \`replaced\` or \`closed\`, stop polling. Exit 3
    means another listener owns the board; use \`--takeover\` only for an intended
-   handoff. Stop when the user ends the review. If the turn must end, explain
-   that listening has stopped and how to resume; a skill does not keep Codex
-   running after the turn ends.
+   handoff. Stop when the user ends the review. ${listenerEnd}
 
 For context, use \`planboard show PLAN.md\` and
 \`planboard thread PLAN.md <item-id>\`. Export with
 \`planboard export PLAN.md\` when the user wants a combined plan and discussion.
-`;
+${request}`;
+}
+
+export const SKILL_MD = reviewSkill("Claude Code", `1. Run \`planboard poll PLAN.md --owner "Claude Code"\` using Bash's tracked
+   background facility (\`run_in_background\`) when available. Use the known
+   model and effort in the label only if available; do not guess them.
+2. Keep the returned task id and collect that task's output when it completes;
+   read the JSON before starting another poll. Do not detach it with \`&\`.
+   If background tasks are unavailable, use a foreground poll with
+   \`--timeout 540\` and a Bash timeout longer than the poll, or shorten the poll
+   to fit the tool's limit. A SessionStart hook only lists boards; it does not
+   run the review loop.`, `
+## Request
+
+$ARGUMENTS
+
+Use the request above when /planboard was invoked with arguments. Otherwise use
+the plan named in the conversation; \`planboard boards\` lists known boards.
+`, `Stop any tracked poll when ending
+   the review. If the session or background task stops, explain that listening
+   has stopped and how to resume; a skill cannot keep a closed session running.`);
+
+export const CODEX_SKILL_MD = reviewSkill("Codex", `1. Run \`planboard poll PLAN.md --timeout 30 --owner "Codex"\`. Use the known
+   model and effort in the label only if available; do not guess them.
+2. Wait for that command's JSON. If the shell tool yields a session id, collect
+   its output with the available session wait/input tool until it exits. Do not
+   start another poll while it is running. A bounded foreground command works
+   when resumable shell sessions are unavailable; shorten the timeout to fit
+   the tool's limit. Do not detach the poll with \`&\` or assume automatic wakeups.`);
+
+export const CURSOR_SKILL_MD = reviewSkill("Cursor", `1. Run \`planboard poll PLAN.md --timeout 30 --owner "Cursor"\` in the terminal
+   tool. Use the known model and effort in the label only if available; do not
+   guess them.
+2. Use a foreground command and keep the poll timeout shorter than the terminal
+   tool's limit. If the tool returns a tracked command or terminal handle,
+   collect that command's output until it exits before starting another poll.
+   Read its JSON result. Do not detach the poll with \`&\` or assume that a
+   background terminal will wake the agent after its turn ends.`);
+
+export const OPENCODE_SKILL_MD = reviewSkill("OpenCode", `1. Run \`planboard poll PLAN.md --timeout 30 --owner "OpenCode"\` with the
+   \`bash\` tool. Use the known model and effort in the label only if available;
+   do not guess them.
+2. Use a foreground command with a tool timeout longer than the poll; shorten
+   the poll if needed to fit the tool's limit. Wait for its JSON and completion
+   before starting another poll. If your environment returns a tracked command
+   handle, collect its output until it exits. Do not detach the poll with \`&\`
+   or assume a background process will wake an ended turn.`, `
+OpenCode loads this skill through its native \`skill\` tool. Use the user's
+conversation to choose the plan. Skill, shell, and edit permissions remain under
+the session's control; the skill does not grant additional access.
+`);

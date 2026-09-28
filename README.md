@@ -32,7 +32,8 @@ npm install && npm run build     # browser bundle (Mermaid, ~3 MB) + the Excalid
 npm link                          # puts `planboard` on your PATH
 planboard setup claude --global   # installs the /planboard skill for Claude Code
 planboard setup codex             # installs the planboard skill for Codex in .agents/skills
-planboard setup cursor            # same guidance for Cursor, inside a project (.cursor/skills + .cursor/rules)
+planboard setup cursor            # installs the Cursor skill and project rule (.cursor/skills + .cursor/rules)
+planboard setup opencode          # installs the OpenCode skill in .opencode/skills
 ```
 
 Node 22 or newer. Everything runs locally; the only network use is your browser talking to
@@ -165,17 +166,39 @@ guidance for their host's polling tools.
 | `planboard init [PLAN.md] [--title …]` | scaffold a plan |
 | `planboard boards` | boards the server knows, with progress and pending notes |
 | `planboard setup claude [--global] [--hook]` | install the Claude Code skill; `--hook` adds a SessionStart hook that lists boards |
-| `planboard setup cursor [--global] [--agents-md]` | install the same guidance for Cursor: `.cursor/skills/planboard/SKILL.md` plus a project rule `.cursor/rules/planboard.mdc`; `--agents-md` appends a section to `AGENTS.md` |
+| `planboard setup cursor [--global] [--agents-md]` | install the Cursor skill in `.cursor/skills/planboard/SKILL.md` plus a project rule `.cursor/rules/planboard.mdc`; `--global` installs the skill in `~/.cursor/skills`; `--agents-md` appends a section to the current project's `AGENTS.md` |
 | `planboard setup codex [--global]` | install the Codex skill in `.agents/skills/planboard/SKILL.md`, or `~/.agents/skills/planboard/SKILL.md` with `--global`; preserves existing `AGENTS.md` files |
+| `planboard setup opencode [--global]` | install the OpenCode skill in `.opencode/skills/planboard/SKILL.md`, or the OpenCode config directory's `skills/planboard/SKILL.md` with `--global` (default `~/.config/opencode`); preserves instructions and configuration |
 | `planboard server` / `planboard stop` | run the server in the foreground / stop the daemon |
 
 Poll delivery is at-least-once: notes are marked delivered only after the response is written,
 so a poll that dies before printing leaves them pending and re-running is safe. One poll per
 board at a time; a second one exits 3 with `LISTENER_ACTIVE` unless it passes `--takeover`.
 
-Claude Code can use its tracked background command facility (`run_in_background`), or a
-foreground poll with `--timeout 540`. Cursor can use a bounded foreground poll that fits its
-command timeout.
+## Agent support
+
+### Claude Code
+
+Run `planboard setup claude` from the project directory (or add `--global` for all projects).
+Invoke `/planboard` or `/planboard PLAN.md`, or ask Claude Code to use planboard. Start a new
+session if the skill does not appear.
+
+The installer follows the official [Claude Code skill conventions](https://code.claude.com/docs/en/skills):
+YAML `name` and `description` front matter in `.claude/skills/planboard/SKILL.md`, or
+`~/.claude/skills/planboard/SKILL.md` with `--global`. The skill uses Claude's `$ARGUMENTS`
+substitution for explicit requests. Setup preserves existing `CLAUDE.md` instructions and
+settings by default. The optional `--hook` adds a `SessionStart` hook to the corresponding
+`.claude/settings.json`, preserving other settings and avoiding duplicate hooks. It runs
+`planboard boards --brief` to list boards; it does not start a listener.
+
+The skill opens the board, polls with `--owner "Claude Code"`, reads notes and attachments,
+edits the Markdown, updates task statuses, replies to each note, and polls again. It uses
+Claude Code's [tracked background commands](https://code.claude.com/docs/en/interactive-mode#background-bash-commands)
+(`run_in_background`) when available and collects the task's output before starting another
+poll. Otherwise it uses `--timeout 540` in the foreground, shortened when needed to fit the
+shell tool's limit. A timeout returns `{"status":"waiting"}`; `replaced` or `closed` ends the
+listener. Tracked tasks belong to the Claude Code session; resume the review if the session
+or listener stops. Browser launch and local-server access follow the session's permissions.
 
 ### Codex
 
@@ -199,6 +222,55 @@ listener. This works with bounded foreground shell commands and does not depend 
 background-command option. A detached process cannot be assumed to wake Codex after a turn ends;
 resume the review in a new turn if listening has stopped. Browser launch and local-server access
 remain subject to the session's permissions.
+
+### Cursor
+
+Run `planboard setup cursor` from the project directory (or add `--global` for all projects).
+In Agent chat, type `/` and select `planboard`, or ask Cursor to use the planboard skill.
+Restart Cursor if the skill does not appear.
+
+The installer follows the official [Cursor skill conventions](https://cursor.com/docs/skills):
+YAML `name` and `description` front matter in `.cursor/skills/planboard/SKILL.md`, or
+`~/.cursor/skills/planboard/SKILL.md` with `--global`. Project setup also writes
+`.cursor/rules/planboard.mdc`, a [project rule](https://cursor.com/docs/rules) with
+`alwaysApply: false` that points to the review workflow. Global setup installs the skill and
+prints the optional rule for Customize → Rules (Settings → Rules in older versions).
+Existing `AGENTS.md` instructions are preserved unless `--agents-md` is supplied; that option
+appends a planboard section to the current project's file, including with `--global`.
+
+The Cursor skill opens the board, polls with `--timeout 30 --owner "Cursor"`, reads notes and
+attachments, edits the Markdown, updates task statuses, replies to each note, and polls again
+during the active review. It uses foreground terminal commands within the tool's time limit.
+If the terminal returns a tracked command handle, collect its output until it exits before
+starting another poll. A timeout returns `{"status":"waiting"}`; `replaced` or `closed` ends
+the listener. A detached terminal cannot be assumed to wake an ended turn; ask Cursor to resume
+the review if listening stops. Browser launch and local-server access follow the session's
+permissions.
+
+### OpenCode
+
+Run `planboard setup opencode` from the project directory (or add `--global` for all projects).
+Ask OpenCode to use the planboard skill to review `PLAN.md`. OpenCode discovers the skill and
+loads it through its native `skill` tool. If it does not appear, restart OpenCode and check
+that skill permissions allow `planboard`.
+
+The installer follows the official [OpenCode skill conventions](https://opencode.ai/docs/skills/):
+YAML `name` and `description` front matter in `.opencode/skills/planboard/SKILL.md`. Global
+setup writes `~/.config/opencode/skills/planboard/SKILL.md` by default. It follows OpenCode's
+[configuration paths](https://github.com/anomalyco/opencode/blob/dev/packages/core/src/global.ts):
+an absolute `XDG_CONFIG_HOME` changes the base to `$XDG_CONFIG_HOME/opencode`, and
+`OPENCODE_CONFIG_DIR` takes precedence when set. [Project instructions](https://opencode.ai/docs/rules/)
+belong in `AGENTS.md`; global instructions live in OpenCode's config directory. Setup installs
+only the reusable skill and leaves those instructions, `opencode.json`, and permissions untouched.
+
+The skill opens the board, polls with `--timeout 30 --owner "OpenCode"` using the `bash` tool,
+reads notes and attachments, edits the Markdown, updates task statuses, replies to each note,
+and polls again during the active review. The shell timeout must exceed the poll timeout;
+collect the command's JSON and completion before starting another poll. A timeout returns
+`{"status":"waiting"}`; `replaced` or `closed` ends the listener. A detached process cannot
+be assumed to wake an ended turn; ask OpenCode to resume if listening stops. Skill loading,
+shell commands, file edits, browser launch, and local-server access follow the session's
+permissions.
 
 ## Where things live
 

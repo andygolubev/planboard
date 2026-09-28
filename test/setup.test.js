@@ -9,7 +9,7 @@ import { fileURLToPath } from "node:url";
 const root = fileURLToPath(new URL("..", import.meta.url));
 const cli = path.join(root, "bin", "planboard.js");
 
-function fixture(t) {
+function fixture(t, setupEnv = {}) {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), "planboard-setup-"));
   t.after(() => fs.rmSync(dir, { recursive: true, force: true }));
   const project = path.join(dir, "project");
@@ -24,7 +24,7 @@ function fixture(t) {
     run(...args) {
       return spawnSync(process.execPath, ["--import", preload, cli, ...args], {
         cwd: project, encoding: "utf8", timeout: 10000,
-        env: { ...process.env, PLANBOARD_HOME: path.join(dir, "state") },
+        env: { ...process.env, PLANBOARD_HOME: path.join(dir, "state"), XDG_CONFIG_HOME: "", OPENCODE_CONFIG_DIR: "", ...setupEnv },
       });
     },
   };
@@ -70,6 +70,14 @@ for (const global of [false, true]) {
     const settings = { permissions: { allow: ["Bash(npm test)"] }, hooks: { SessionStart: [{ hooks: [{ type: "command", command: "echo existing" }] }] } };
     const settingsPath = path.join(dest, "settings.json");
     fs.writeFileSync(settingsPath, JSON.stringify(settings));
+    const instructionsPath = path.join(f.project, "CLAUDE.md");
+    const globalInstructionsPath = path.join(f.home, ".claude", "CLAUDE.md");
+    const instructions = "# Existing Claude instructions\n";
+    fs.mkdirSync(path.dirname(globalInstructionsPath), { recursive: true });
+    fs.writeFileSync(instructionsPath, instructions);
+    fs.writeFileSync(globalInstructionsPath, instructions);
+    assert.equal(f.run("setup", "claude", ...(global ? ["--global"] : [])).status, 0);
+    assert.equal(fs.readFileSync(settingsPath, "utf8"), JSON.stringify(settings), "settings stay unchanged without --hook");
     const args = ["setup", "claude", "--hook", ...(global ? ["--global"] : [])];
     assert.equal(f.run(...args).status, 0);
     assert.equal(f.run(...args).status, 0);
@@ -81,17 +89,25 @@ for (const global of [false, true]) {
     const skill = fs.readFileSync(path.join(dest, "skills", "planboard", "SKILL.md"), "utf8");
     assert.match(skill, /\$ARGUMENTS/);
     assert.equal(skill, fs.readFileSync(path.join(root, "skills", "planboard", "SKILL.md"), "utf8"));
+    assert.equal(fs.readFileSync(instructionsPath, "utf8"), instructions);
+    assert.equal(fs.readFileSync(globalInstructionsPath, "utf8"), instructions);
+    assert.equal(fs.existsSync(path.join(global ? f.project : f.home, ".claude", "skills", "planboard")), false);
   });
 
   test(`Cursor setup retains ${global ? "global" : "project"} behavior`, (t) => {
     const f = fixture(t);
     fs.writeFileSync(path.join(f.project, "AGENTS.md"), "# Existing project rules\n");
+    assert.equal(f.run("setup", "cursor", ...(global ? ["--global"] : [])).status, 0);
+    assert.equal(fs.readFileSync(path.join(f.project, "AGENTS.md"), "utf8"), "# Existing project rules\n", "instructions stay unchanged without --agents-md");
     const args = ["setup", "cursor", "--agents-md", ...(global ? ["--global"] : [])];
     const r = f.run(...args);
     assert.equal(r.status, 0, r.stderr);
     assert.equal(f.run(...args).status, 0);
     const dest = path.join(global ? f.home : f.project, ".cursor");
-    assert.ok(fs.existsSync(path.join(dest, "skills", "planboard", "SKILL.md")));
+    const skill = fs.readFileSync(path.join(dest, "skills", "planboard", "SKILL.md"), "utf8");
+    assert.equal(skill, fs.readFileSync(path.join(root, "skills", "cursor", "planboard", "SKILL.md"), "utf8"));
+    assert.doesNotMatch(skill, /\$ARGUMENTS|run_in_background/);
+    assert.equal(fs.existsSync(path.join(global ? f.project : f.home, ".cursor", "skills", "planboard")), false);
     assert.equal(fs.existsSync(path.join(dest, "rules", "planboard.mdc")), !global);
     const agents = fs.readFileSync(path.join(f.project, "AGENTS.md"), "utf8");
     assert.ok(agents.startsWith("# Existing project rules\n"));
@@ -99,18 +115,83 @@ for (const global of [false, true]) {
     if (global) assert.match(r.stdout, /Settings › Rules/);
     else assert.match(fs.readFileSync(path.join(dest, "rules", "planboard.mdc"), "utf8"), /alwaysApply: false/);
   });
+
+  test(`OpenCode setup installs a ${global ? "global" : "project"} skill and preserves instructions and configuration`, (t) => {
+    const f = fixture(t);
+    const configDir = path.join(f.home, ".config", "opencode");
+    const dest = global ? configDir : path.join(f.project, ".opencode");
+    fs.mkdirSync(configDir, { recursive: true });
+    const preserved = new Map([
+      [path.join(f.project, "AGENTS.md"), "# Existing project instructions\n"],
+      [path.join(configDir, "AGENTS.md"), "# Existing user instructions\n"],
+      [path.join(f.project, "opencode.json"), '{ "permission": { "bash": "ask" } }\n'],
+      [path.join(configDir, "opencode.json"), '{ "permission": { "skill": { "*": "ask" } } }\n'],
+      [path.join(dest, "skills", "other", "SKILL.md"), "unrelated skill\n"],
+    ]);
+    for (const [file, content] of preserved) {
+      fs.mkdirSync(path.dirname(file), { recursive: true });
+      fs.writeFileSync(file, content);
+    }
+    const args = ["setup", "opencode", ...(global ? ["--global"] : [])];
+    const r = f.run(...args);
+    assert.equal(r.status, 0, r.stderr);
+    const skillPath = path.join(dest, "skills", "planboard", "SKILL.md");
+    const skill = fs.readFileSync(skillPath, "utf8");
+    assert.match(skill, /^---\nname: planboard\ndescription: [^\n]+\n---\n/);
+    assert.doesNotMatch(skill, /\$ARGUMENTS|run_in_background/);
+    assert.equal(skill, fs.readFileSync(path.join(root, "skills", "opencode", "planboard", "SKILL.md"), "utf8"));
+    assert.equal(f.run(...args).status, 0);
+    assert.equal(fs.readFileSync(skillPath, "utf8"), skill, "repeated setup is idempotent");
+    for (const [file, content] of preserved) assert.equal(fs.readFileSync(file, "utf8"), content);
+    const otherScope = global ? path.join(f.project, ".opencode") : configDir;
+    assert.equal(fs.existsSync(path.join(otherScope, "skills", "planboard")), false);
+  });
 }
 
-test("setup defaults to Claude, advertises Codex, and rejects unsupported Codex options before writing", (t) => {
+test("OpenCode global setup follows config overrides while project setup stays local", (t) => {
+  const configRoot = fs.mkdtempSync(path.join(os.tmpdir(), "planboard-config-"));
+  t.after(() => fs.rmSync(configRoot, { recursive: true, force: true }));
+  const xdg = path.join(configRoot, "xdg");
+  const custom = path.join(configRoot, "custom");
+  const f = fixture(t, { XDG_CONFIG_HOME: xdg, OPENCODE_CONFIG_DIR: custom });
+  assert.equal(f.run("setup", "opencode").status, 0);
+  assert.ok(fs.existsSync(path.join(f.project, ".opencode", "skills", "planboard", "SKILL.md")));
+  assert.equal(fs.existsSync(custom), false);
+  assert.equal(fs.existsSync(xdg), false);
+  assert.equal(f.run("setup", "opencode", "--global").status, 0);
+  assert.ok(fs.existsSync(path.join(custom, "skills", "planboard", "SKILL.md")));
+  assert.equal(fs.existsSync(xdg), false, "explicit config directory takes precedence over XDG");
+  assert.equal(fs.existsSync(path.join(f.home, ".config")), false);
+
+  const g = fixture(t, { XDG_CONFIG_HOME: xdg });
+  assert.equal(g.run("setup", "opencode", "--global").status, 0);
+  assert.ok(fs.existsSync(path.join(xdg, "opencode", "skills", "planboard", "SKILL.md")));
+  assert.equal(fs.existsSync(path.join(g.home, ".config")), false);
+});
+
+test("OpenCode ignores a relative XDG_CONFIG_HOME", (t) => {
+  const f = fixture(t, { XDG_CONFIG_HOME: "relative-config" });
+  assert.equal(f.run("setup", "opencode", "--global").status, 0);
+  assert.ok(fs.existsSync(path.join(f.home, ".config", "opencode", "skills", "planboard", "SKILL.md")));
+  assert.equal(fs.existsSync(path.join(f.project, "relative-config")), false);
+});
+
+test("setup defaults to Claude, advertises all hosts, and rejects unsupported options before writing", (t) => {
   const f = fixture(t);
   assert.equal(f.run("setup").status, 0);
   assert.ok(fs.existsSync(path.join(f.project, ".claude", "skills", "planboard", "SKILL.md")));
-  assert.match(f.run("--help").stdout, /planboard setup codex \[--global\]/);
+  const help = f.run("--help").stdout;
+  for (const target of ["claude", "cursor", "codex", "opencode"]) {
+    assert.ok(help.includes(`planboard setup ${target} [--global]`));
+  }
   const unknown = f.run("setup", "unknown");
   assert.equal(unknown.status, 1);
-  assert.match(unknown.stderr, /claude.*cursor.*codex/);
-  for (const flag of ["--hook", "--agents-md"]) {
-    assert.equal(f.run("setup", "codex", flag).status, 1);
+  assert.match(unknown.stderr, /claude.*cursor.*codex.*opencode/);
+  for (const target of ["codex", "opencode"]) {
+    for (const flag of ["--hook", "--agents-md"]) {
+      assert.equal(f.run("setup", target, flag).status, 1);
+    }
   }
   assert.equal(fs.existsSync(path.join(f.project, ".agents")), false);
+  assert.equal(fs.existsSync(path.join(f.project, ".opencode")), false);
 });
