@@ -1,0 +1,658 @@
+<title>planboard architecture</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Serif:ital,wght@0,400;0,600;1,400&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+  :root {
+    --bg: #f3f5f8;
+    --paper: #ffffff;
+    --ink: #1a1f2b;
+    --muted: #5d6472;
+    --line: #d9dee7;
+    --accent: #2456d6;
+    --accent-soft: #e6ecfb;
+    --done: #2f8f4e;
+    --progress: #d9860b;
+    --blocked: #cf3a2b;
+    --question: #7a3fc4;
+    --code-bg: #eef1f6;
+    --shadow: 0 1px 2px rgba(20, 30, 60, 0.06), 0 8px 24px rgba(20, 30, 60, 0.06);
+    --sans: "IBM Plex Sans", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    --serif: "IBM Plex Serif", Georgia, "Times New Roman", serif;
+    --mono: "IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #141821; --paper: #1c2130; --ink: #e8eaf0; --muted: #9aa3b5; --line: #2c3344;
+      --accent: #7ea1ff; --accent-soft: #263453; --done: #56b877; --progress: #e6a54a; --blocked: #ec6b5c; --question: #b58cf0;
+      --code-bg: #161b26; --shadow: 0 1px 2px rgba(0,0,0,.5), 0 8px 24px rgba(0,0,0,.35);
+      color-scheme: dark;
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #141821; --paper: #1c2130; --ink: #e8eaf0; --muted: #9aa3b5; --line: #2c3344;
+    --accent: #7ea1ff; --accent-soft: #263453; --done: #56b877; --progress: #e6a54a; --blocked: #ec6b5c; --question: #b58cf0;
+    --code-bg: #161b26; --shadow: 0 1px 2px rgba(0,0,0,.5), 0 8px 24px rgba(0,0,0,.35);
+    color-scheme: dark;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--ink); font: 16px/1.6 var(--serif); }
+  a { color: var(--accent); }
+  code, pre, .mono { font-family: var(--mono); font-size: 0.86em; }
+  code { background: var(--code-bg); padding: 1px 5px; border-radius: 4px; }
+  pre { background: var(--code-bg); border: 1px solid var(--line); border-radius: 8px; padding: 14px 16px; overflow-x: auto; line-height: 1.45; }
+  pre code { background: none; padding: 0; font-size: 13px; }
+  h1, h2, h3 { font-family: var(--sans); line-height: 1.2; text-wrap: balance; margin: 0; }
+  h1 { font-size: 34px; font-weight: 700; letter-spacing: -0.01em; }
+  h2 { font-size: 24px; font-weight: 600; margin-top: 8px; }
+  h3 { font-size: 17px; font-weight: 600; margin-top: 28px; margin-bottom: 8px; }
+  p { margin: 0.7em 0; max-width: 68ch; }
+  ul, ol { padding-left: 1.3em; max-width: 68ch; }
+  li { margin: 0.3em 0; }
+  li::marker { color: var(--muted); }
+
+  .wrap { max-width: 1140px; margin: 0 auto; padding-block: 28px 80px; padding-inline: 20px; }
+  .head { display: grid; gap: 14px; margin-bottom: 26px; }
+  .eyebrow { font-family: var(--sans); font-size: 12px; font-weight: 600; letter-spacing: 0.1em; text-transform: uppercase; color: var(--muted); }
+  .lede { font-size: 18px; color: var(--muted); max-width: 70ch; margin: 0; }
+  .facts { display: flex; flex-wrap: wrap; gap: 10px 22px; font-family: var(--sans); font-size: 13px; color: var(--muted); }
+  .facts b { color: var(--ink); font-weight: 600; }
+
+  .layout { display: grid; grid-template-columns: 1fr; gap: 28px; }
+  @media (min-width: 1000px) {
+    .layout { grid-template-columns: 210px minmax(0, 1fr); gap: 44px; align-items: start; }
+    .toc { position: sticky; top: calc(env(safe-area-inset-top, 0px) + 20px); }
+  }
+  .toc { font-family: var(--sans); font-size: 13.5px; }
+  .toc ol { list-style: none; padding: 0; margin: 0; display: flex; flex-wrap: wrap; gap: 6px 14px; }
+  @media (min-width: 1000px) { .toc ol { flex-direction: column; gap: 4px; } }
+  .toc a { color: var(--muted); text-decoration: none; display: inline-flex; gap: 8px; padding: 3px 0; border-radius: 4px; }
+  .toc a:hover, .toc a:focus-visible { color: var(--accent); outline: none; }
+  .toc .n { font-family: var(--mono); font-size: 11.5px; color: var(--accent); min-width: 1.4em; }
+
+  main { min-width: 0; }
+  section { background: var(--paper); border: 1px solid var(--line); border-radius: 14px; padding: 26px 30px 28px; box-shadow: var(--shadow); margin-bottom: 22px; }
+  @media (max-width: 600px) { section { padding: 20px 16px; } h1 { font-size: 28px; } }
+  section > .eyebrow { margin-bottom: 6px; }
+  .n-badge { display: inline-block; font-family: var(--mono); font-size: 12px; color: var(--accent); background: var(--accent-soft); border-radius: 6px; padding: 1px 7px; margin-right: 8px; vertical-align: middle; }
+
+  figure { margin: 22px 0 8px; }
+  figure svg { display: block; width: 100%; height: auto; max-width: 100%; color: var(--ink); font-family: var(--sans); }
+  figcaption { font-family: var(--sans); font-size: 13.5px; color: var(--muted); margin-top: 8px; max-width: 78ch; }
+  .fig-scroll { overflow-x: auto; }
+  .fig-scroll svg { min-width: 640px; }
+  svg .box { fill: var(--paper); stroke: currentColor; stroke-width: 1.4; }
+  svg .box-soft { fill: var(--code-bg); stroke: currentColor; stroke-width: 1.2; }
+  svg .box-accent { fill: var(--accent-soft); stroke: var(--accent); stroke-width: 1.6; }
+  svg .file { fill: var(--code-bg); stroke: currentColor; stroke-width: 1.2; stroke-dasharray: 5 4; }
+  svg text { fill: currentColor; font-size: 12.5px; }
+  svg .t-b { font-weight: 600; font-size: 13.5px; }
+  svg .t-m { fill: var(--muted); font-size: 11.5px; }
+  svg .t-mono { font-family: var(--mono); font-size: 11.5px; }
+  svg .t-acc { fill: var(--accent); font-weight: 600; }
+  svg .flow { stroke: currentColor; stroke-width: 1.4; fill: none; }
+  svg .flow-acc { stroke: var(--accent); stroke-width: 1.8; fill: none; }
+  svg .flow-push { stroke: currentColor; stroke-width: 1.3; fill: none; stroke-dasharray: 6 4; }
+  svg .lifeline { stroke: currentColor; stroke-opacity: 0.3; stroke-dasharray: 3 5; stroke-width: 1.2; }
+  svg .dot-l { fill: var(--done); } svg .dot-w { fill: var(--progress); } svg .dot-n { fill: var(--muted); }
+
+  table { border-collapse: collapse; width: 100%; font-family: var(--sans); font-size: 14px; margin: 14px 0 6px; }
+  th, td { text-align: left; vertical-align: top; padding: 9px 10px; border-bottom: 1px solid var(--line); }
+  th { font-weight: 600; color: var(--muted); font-size: 12.5px; letter-spacing: 0.04em; text-transform: uppercase; }
+  td:first-child { white-space: nowrap; }
+  .tbl-scroll { overflow-x: auto; }
+  .pill { display: inline-block; font-family: var(--sans); font-size: 11.5px; font-weight: 600; padding: 1px 8px; border-radius: 999px; color: #fff; background: var(--muted); vertical-align: middle; }
+  .pill.done { background: var(--done); } .pill.progress { background: var(--progress); } .pill.blocked { background: var(--blocked); } .pill.question { background: var(--question); }
+  .pill.now { background: var(--accent); } .pill.plan { background: transparent; color: var(--progress); border: 1px solid var(--progress); }
+  .mark { display: inline-block; width: 14px; height: 14px; border-radius: 50%; border: 2px solid var(--muted); vertical-align: -2px; margin-right: 6px; }
+  .mark.done { border-color: var(--done); background: var(--done); } .mark.progress { border-color: var(--progress); background: linear-gradient(90deg, var(--progress) 50%, transparent 50%); }
+  .mark.blocked { border-color: var(--blocked); background: var(--blocked); } .mark.question { border-color: var(--question); background: var(--question); } .mark.dropped { border-color: var(--line); background: var(--line); }
+
+  .callout { border-left: 3px solid var(--accent); background: var(--accent-soft); padding: 10px 14px; border-radius: 0 8px 8px 0; margin: 16px 0; font-family: var(--sans); font-size: 14.5px; max-width: 72ch; }
+  .callout.warn { border-left-color: var(--progress); background: color-mix(in srgb, var(--progress) 12%, transparent); }
+  .grid2 { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 14px; margin-top: 14px; }
+  .card { border: 1px solid var(--line); border-radius: 10px; padding: 14px 16px; font-family: var(--sans); font-size: 14.5px; }
+  .card h4 { margin: 0 0 6px; font-size: 14px; font-weight: 600; display: flex; align-items: center; gap: 8px; }
+  .card p, .card ul { margin: 4px 0; max-width: none; font-family: var(--serif); font-size: 14.5px; }
+  .card ul { padding-left: 1.1em; }
+  .kbd { font-family: var(--mono); font-size: 12.5px; background: var(--code-bg); border: 1px solid var(--line); border-bottom-width: 2px; border-radius: 5px; padding: 0 6px; }
+  .status-row { display: flex; flex-wrap: wrap; gap: 10px 18px; font-family: var(--sans); font-size: 14px; align-items: center; margin: 10px 0; }
+  .dot { display: inline-block; width: 10px; height: 10px; border-radius: 50%; margin-right: 6px; vertical-align: -1px; background: var(--muted); }
+  .dot.l { background: var(--done); } .dot.w { background: var(--progress); }
+  @media (prefers-reduced-motion: no-preference) { .toc a { transition: color .15s; } }
+</style>
+
+<div class="wrap">
+  <header class="head">
+    <div class="eyebrow">planboard · how it is put together</div>
+    <h1>planboard architecture</h1>
+    <p class="lede">One local daemon connects three things: your browser showing the board, the plan file with its sidecar of notes and history, and whichever agent session is polling. This page walks through how the agent works with the plan, how polling works, where model and effort are decided, how a change travels from a saved file to a flashing item on your screen and how you review it, and how screenshots and whiteboard sketches reach the agent.</p>
+    <div class="facts">
+      <span><b>Source of truth</b> PLAN.md</span>
+      <span><b>State</b> PLAN.board/ beside it</span>
+      <span><b>Daemon</b> node, port 4747</span>
+      <span><b>Agent side</b> the planboard CLI</span>
+      <span><b>Version</b> 0.2.0</span>
+    </div>
+  </header>
+
+  <div class="layout">
+    <nav class="toc" aria-label="Contents">
+      <ol>
+        <li><a href="#picture"><span class="n">0</span>The picture</a></li>
+        <li><a href="#agent"><span class="n">1</span>Agent and plan</a></li>
+        <li><a href="#poll"><span class="n">2</span>Polling</a></li>
+        <li><a href="#model"><span class="n">3</span>Model and effort</a></li>
+        <li><a href="#changes"><span class="n">4</span>Flow of changes</a></li>
+        <li><a href="#anchors"><span class="n">5</span>Anchors and notes</a></li>
+        <li><a href="#attach"><span class="n">6</span>Screenshots and the whiteboard</a></li>
+        <li><a href="#files"><span class="n">7</span>Files, export, commits</a></li>
+        <li><a href="#trust"><span class="n">8</span>Trust boundary</a></li>
+        <li><a href="#setup"><span class="n">9</span>Setting up an agent</a></li>
+        <li><a href="#lineage"><span class="n">10</span>Lineage</a></li>
+      </ol>
+    </nav>
+
+    <main>
+      <section id="picture">
+        <div class="eyebrow"><span class="n-badge">0</span>The picture</div>
+        <h2>Three parties, one daemon, one file</h2>
+        <p>Nothing here is a cloud service or a model call. The daemon is a small Node process on your machine. The browser talks only to the daemon. The agent talks to the daemon through the CLI and edits the plan file directly. The daemon watches that file and keeps the board honest.</p>
+        <figure class="fig-scroll">
+          <svg viewBox="0 0 960 430" role="img" aria-label="Your browser and the agent session both talk to the planboard daemon; the daemon watches PLAN.md and writes the PLAN.board sidecar; the agent edits PLAN.md directly.">
+            <defs>
+              <marker id="arr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="currentColor"/></marker>
+              <marker id="arr-acc" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="var(--accent)"/></marker>
+            </defs>
+            <!-- browser -->
+            <rect class="box" x="30" y="70" width="220" height="130" rx="10"/>
+            <text class="t-b" x="140" y="100" text-anchor="middle">Your browser</text>
+            <text class="t-m" x="140" y="120" text-anchor="middle">the board, one tab per plan</text>
+            <text x="140" y="150" text-anchor="middle">click · Add note · Send</text>
+            <text x="140" y="172" text-anchor="middle">Thread · Activity · Changes</text>
+            <!-- daemon -->
+            <rect class="box-accent" x="370" y="50" width="220" height="170" rx="10"/>
+            <text class="t-b" x="480" y="80" text-anchor="middle">planboard daemon</text>
+            <text class="t-m" x="480" y="100" text-anchor="middle">node · port 4747 · one per machine</text>
+            <text x="480" y="130" text-anchor="middle">per board: watcher · store</text>
+            <text x="480" y="152" text-anchor="middle">poll queue · WebSocket</text>
+            <text x="480" y="174" text-anchor="middle">asset route (plan dir only)</text>
+            <text x="480" y="196" text-anchor="middle">Host allowlist · Origin guard</text>
+            <!-- agent -->
+            <rect class="box" x="710" y="70" width="220" height="130" rx="10"/>
+            <text class="t-b" x="820" y="100" text-anchor="middle">Agent session</text>
+            <text class="t-m" x="820" y="120" text-anchor="middle">Codex · Claude Code · Cursor</text>
+            <text class="t-mono" x="820" y="150" text-anchor="middle">planboard poll · reply · set</text>
+            <text x="820" y="172" text-anchor="middle">edits PLAN.md directly</text>
+            <!-- files -->
+            <rect class="file" x="330" y="300" width="300" height="104" rx="8"/>
+            <text class="t-b" x="480" y="328" text-anchor="middle">PLAN.md — source of truth</text>
+            <text class="t-mono" x="480" y="352" text-anchor="middle">PLAN.board/  notes.json · events.jsonl</text>
+            <text class="t-mono" x="480" y="372" text-anchor="middle">snapshot.json · visits.json (ignored)</text>
+            <text class="t-m" x="480" y="392" text-anchor="middle">commit these with the plan</text>
+            <!-- browser <-> daemon -->
+            <line class="flow" x1="250" y1="112" x2="370" y2="112" marker-end="url(#arr)"/>
+            <text class="t-m" x="310" y="102" text-anchor="middle">notes · Send</text>
+            <text class="t-m" x="310" y="130" text-anchor="middle">set status</text>
+            <line class="flow-push" x1="370" y1="165" x2="250" y2="165" marker-end="url(#arr)"/>
+            <text class="t-m" x="310" y="157" text-anchor="middle">WebSocket push</text>
+            <text class="t-m" x="310" y="183" text-anchor="middle">plan · notes · presence</text>
+            <!-- agent -> daemon -->
+            <line class="flow-acc" x1="710" y1="112" x2="590" y2="112" marker-end="url(#arr-acc)"/>
+            <text class="t-acc" x="650" y="102" text-anchor="middle">GET poll</text>
+            <text class="t-acc" x="650" y="130" text-anchor="middle">held open</text>
+            <line class="flow" x1="710" y1="165" x2="590" y2="165" marker-end="url(#arr)"/>
+            <text class="t-m" x="650" y="155" text-anchor="middle">POST reply</text>
+            <text class="t-m" x="650" y="183" text-anchor="middle">POST status</text>
+            <!-- daemon <-> files -->
+            <line class="flow" x1="480" y1="220" x2="480" y2="300" marker-end="url(#arr)"/>
+            <text class="t-m" x="492" y="250">watch · parse · diff</text>
+            <text class="t-m" x="492" y="266">persist notes, events</text>
+            <!-- agent -> files -->
+            <line class="flow" x1="760" y1="200" x2="634" y2="326" marker-end="url(#arr)"/>
+            <text class="t-m" x="712" y="262">writes PLAN.md</text>
+            <text class="t-m" x="712" y="278">(save = re-render)</text>
+            <!-- browser never touches files -->
+            <text class="t-m" x="140" y="330" text-anchor="middle">the browser never touches files;</text>
+            <text class="t-m" x="140" y="348" text-anchor="middle">it only sees what the daemon serves</text>
+          </svg>
+          <figcaption>Fig. 0 — The daemon is the only process with its hands on the files. The agent's poll (blue) is the one long-lived request; everything toward the browser is pushed over a WebSocket.</figcaption>
+        </figure>
+      </section>
+
+      <section id="agent">
+        <div class="eyebrow"><span class="n-badge">1</span>Agent and plan</div>
+        <h2>The agent edits Markdown, never HTML</h2>
+        <p>The plan is an ordinary Markdown file with three conventions. The agent reads it with <code>planboard show</code>, edits it with its normal file tools, flips statuses with <code>planboard set</code>, and never generates any page markup. Because the renderer is fixed, every plan looks the same every day, and a diff of PLAN.md is a diff of the plan.</p>
+        <div class="tbl-scroll">
+        <table>
+          <thead><tr><th>Convention</th><th>In the file</th><th>On the board</th></tr></thead>
+          <tbody>
+            <tr><td>Status</td><td><code>- [ ]</code> <code>- [~]</code> <code>- [x]</code> <code>- [!]</code> <code>- [?]</code> <code>- [-]</code></td><td><span class="mark"></span>to do <span class="mark progress"></span>in progress <span class="mark done"></span>done <span class="mark blocked"></span>blocked <span class="mark question"></span>needs your decision <span class="mark dropped"></span>dropped</td></tr>
+            <tr><td>Anchor id</td><td><code>{#m1-parser}</code> at the end of an item, heading or fence info</td><td>the key a thread and the status history attach to; it must never be renamed</td></tr>
+            <tr><td>Diagram</td><td><code>```mermaid loop</code> fence</td><td>rendered in the browser; each node is clickable; the whole diagram is too</td></tr>
+            <tr><td>Image</td><td><code>![caption](docs/board.jpg)</code>, relative path</td><td>served from the plan's directory only; click a point to pin a note there</td></tr>
+            <tr><td>Everything else</td><td>headings, paragraphs, tables, raw HTML or SVG</td><td>rendered as written; paragraphs are clickable as "text in section"</td></tr>
+          </tbody>
+        </table>
+        </div>
+        <h3>What the agent does, in order</h3>
+        <ol>
+          <li><b>Orient.</b> <code>planboard show PLAN.md</code> prints the plan as the board sees it: ids, statuses, how many notes sit on each item, and whether notes are pending. <code>planboard thread PLAN.md site-soil</code> prints one conversation.</li>
+          <li><b>Open.</b> <code>planboard PLAN.md</code> registers the board with the daemon (starting it if needed) and prints the URL plus the next step. Re-running is harmless.</li>
+          <li><b>Wait.</b> <code>planboard poll PLAN.md --owner "Review agent"</code> blocks until you press Send. Section 2 is about this call.</li>
+          <li><b>Act on each note.</b> Edit the file where the plan should change; <code>planboard set PLAN.md &lt;id&gt; done</code> to flip a status without touching the line by hand; <code>planboard reply PLAN.md --to n_ywy527 "…"</code> so the answer appears in that item's thread, not in chat.</li>
+          <li><b>Poll again.</b> The guidance forbids narrating the same answers in chat: the board is the conversation.</li>
+        </ol>
+        <p>All of this is spelled out once, in <code>planboard --help</code>. The Claude Code, Cursor, and Codex integrations point there for the command contract, with polling guidance adapted to each host.</p>
+      </section>
+
+      <section id="poll">
+        <div class="eyebrow"><span class="n-badge">2</span>Polling</div>
+        <h2>One long request, answered when you press Send</h2>
+        <p>The agent does not check the board on a timer. It issues one HTTP request that the daemon holds open. Your Send is what completes it. The response carries every sent note, the current text and status of the item each note points at, and the whole thread on that item so far, so the agent has the chain of thought without rereading anything.</p>
+        <figure class="fig-scroll">
+          <svg viewBox="0 0 960 640" role="img" aria-label="Sequence: the agent's poll is held by the daemon; you add notes and press Send; the daemon answers the poll with notes and threads and pushes presence and plan updates to the browser; the agent edits, replies and polls again.">
+            <defs>
+              <marker id="arr2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="currentColor"/></marker>
+              <marker id="arr2-acc" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="var(--accent)"/></marker>
+            </defs>
+            <rect class="box" x="50" y="16" width="200" height="36" rx="8"/><text class="t-b" x="150" y="40" text-anchor="middle">You · browser</text>
+            <rect class="box-accent" x="380" y="16" width="200" height="36" rx="8"/><text class="t-b" x="480" y="40" text-anchor="middle">planboard daemon</text>
+            <rect class="box" x="710" y="16" width="200" height="36" rx="8"/><text class="t-b" x="810" y="40" text-anchor="middle">Agent session</text>
+            <line class="lifeline" x1="150" y1="52" x2="150" y2="612"/>
+            <line class="lifeline" x1="480" y1="52" x2="480" y2="612"/>
+            <line class="lifeline" x1="810" y1="52" x2="810" y2="612"/>
+
+            <line class="flow-acc" x1="810" y1="95" x2="480" y2="95" marker-end="url(#arr2-acc)"/>
+            <text class="t-acc t-mono" x="645" y="87" text-anchor="middle">planboard poll  (request held open)</text>
+            <line class="flow-push" x1="480" y1="130" x2="150" y2="130" marker-end="url(#arr2)"/>
+            <circle class="dot-l" cx="178" cy="122" r="4"/><text class="t-m" x="188" y="126">presence: listening · Review agent</text>
+
+            <line class="flow" x1="150" y1="180" x2="480" y2="180" marker-end="url(#arr2)"/>
+            <text class="t-m" x="315" y="172" text-anchor="middle">Add note → stored as queued (dashed, removable)</text>
+            <line class="flow" x1="150" y1="215" x2="480" y2="215" marker-end="url(#arr2)"/>
+            <text class="t-m" x="315" y="207" text-anchor="middle">Send → queued notes become sent</text>
+
+            <line class="flow-acc" x1="480" y1="255" x2="810" y2="255" marker-end="url(#arr2-acc)"/>
+            <text class="t-acc" x="645" y="247" text-anchor="middle">poll response: notes + current item + whole thread</text>
+            <text class="t-m" x="645" y="272" text-anchor="middle">delivered is marked only after the response is written</text>
+            <line class="flow-push" x1="480" y1="295" x2="150" y2="295" marker-end="url(#arr2)"/>
+            <circle class="dot-w" cx="178" cy="287" r="4"/><text class="t-m" x="188" y="291">presence: working on your notes</text>
+
+            <line class="flow" x1="810" y1="345" x2="480" y2="345" marker-end="url(#arr2)"/>
+            <text class="t-m t-mono" x="645" y="337" text-anchor="middle">edit PLAN.md (save) · planboard set &lt;id&gt; &lt;status&gt;</text>
+            <line class="flow-push" x1="480" y1="380" x2="150" y2="380" marker-end="url(#arr2)"/>
+            <text class="t-m" x="315" y="372" text-anchor="middle">plan changed → board re-renders, item flashes</text>
+
+            <line class="flow" x1="810" y1="425" x2="480" y2="425" marker-end="url(#arr2)"/>
+            <text class="t-m t-mono" x="645" y="417" text-anchor="middle">planboard reply --to n_… "answer"</text>
+            <line class="flow-push" x1="480" y1="460" x2="150" y2="460" marker-end="url(#arr2)"/>
+            <circle class="dot-n" cx="178" cy="452" r="4"/><text class="t-m" x="188" y="456">reply lands in the item's thread · presence: waiting</text>
+
+            <line class="flow-acc" x1="810" y1="510" x2="480" y2="510" marker-end="url(#arr2-acc)"/>
+            <text class="t-acc t-mono" x="645" y="502" text-anchor="middle">planboard poll  (again, as a background job)</text>
+            <line class="flow-push" x1="480" y1="545" x2="150" y2="545" marker-end="url(#arr2)"/>
+            <circle class="dot-l" cx="178" cy="537" r="4"/><text class="t-m" x="188" y="541">presence: listening</text>
+
+            <text class="t-m" x="150" y="600" text-anchor="middle">dashed = WebSocket push</text>
+            <text class="t-m" x="810" y="600" text-anchor="middle">blue = the long poll</text>
+          </svg>
+          <figcaption>Fig. 2 — One round of the loop. The presence dot in the board's top bar is the browser's view of the poll: green while a poll is attached, amber after delivery until the agent replies, grey when nothing is listening.</figcaption>
+        </figure>
+        <h3>Rules the poll obeys</h3>
+        <ul>
+          <li><b>At least once.</b> Notes are marked <em>delivered</em> only after the response has been written to the socket. A poll that is killed mid-flight leaves them <em>sent</em>, so re-running the same command is always safe.</li>
+          <li><b>One listener per board.</b> A second poll is refused with <code>LISTENER_ACTIVE</code> (exit 3). Pass <code>--takeover</code> to replace the current one; the old poll returns <code>replaced</code>.</li>
+          <li><b>Timeouts.</b> Without <code>--timeout</code> the request waits until notes arrive. Claude Code supports tracked background commands, with <code>--timeout 540</code> as a foreground fallback. Codex uses <code>--timeout 30</code>, collects any yielded shell session until it exits, and re-polls on <code>{"status":"waiting"}</code> during an active review. A skill does not guarantee a wakeup after the Codex turn ends. Cursor can use a bounded poll that fits its command timeout.</li>
+          <li><b>Queue first, send once.</b> Notes wait as <em>queued</em> until you press Send, so you can walk the whole plan and deliver one coherent batch instead of waking the agent per click.</li>
+        </ul>
+        <div class="status-row"><span><span class="dot"></span>no agent listening</span><span><span class="dot l"></span>agent is listening · <span class="mono">owner label</span></span><span><span class="dot w"></span>agent is working on your notes…</span></div>
+      </section>
+
+      <section id="model">
+        <div class="eyebrow"><span class="n-badge">3</span>Model and effort</div>
+        <h2>The session that polls is the brain</h2>
+        <p>planboard never calls a model. It only carries your notes to whichever agent session runs <code>planboard poll</code>, and carries that session's replies back. So the model and the effort level that process a note are properties of that session, not of planboard.</p>
+        <div class="grid2">
+          <div class="card">
+            <h4><span class="pill now">Today</span> Set it in the session</h4>
+            <p>In Claude Code, <span class="kbd">/model</span> and <span class="kbd">/effort</span> change the model and the reasoning effort for the next turn onward. The next batch of notes that session handles is processed with those settings. In Cursor and Codex, use the session’s model and reasoning settings. The owner label reports those settings; it does not change them.</p>
+          </div>
+          <div class="card">
+            <h4><span class="pill now">Today</span> See who is listening</h4>
+            <p>The agent passes <code>--owner "Review agent"</code> when it polls, and the board shows that label next to <em>agent is listening</em>. The label is supplied by the caller, not a verified model identity; if it says <em>no agent listening</em>, nothing will read your notes until a poll starts.</p>
+          </div>
+          <div class="card">
+            <h4><span class="pill now">Today</span> Two sessions, one board</h4>
+            <p>Only one poll may listen at a time. To hand a board to a different model, start the poll from that session with <code>--takeover</code>; the first session's poll returns <code>replaced</code> and stops. Your notes are never lost in the hand-over, because they stay <em>sent</em> until a response is written.</p>
+          </div>
+          <div class="card">
+            <h4><span class="pill now">Today</span> Per note: depth</h4>
+            <p>The composer has a <b>quick · normal · deep</b> switch. The choice travels with the note as <code>"depth"</code> in the poll JSON, and <code>next_step</code> adds one line of guidance when a batch contains quick or deep notes. <em>quick</em> = a one-line answer from what the agent knows, trivial edits only; <em>normal</em> = read, change, verify, reply briefly; <em>deep</em> = research, weigh alternatives, implement and verify, explain the reasoning in the reply. Depth says how hard to work on that note; the model stays the session's.</p>
+          </div>
+        </div>
+        <div class="callout"><b>How to think about it:</b> <span class="kbd">/model</span> and <span class="kbd">/effort</span> pick the brain for the whole sitting; the depth switch says how much of it one note deserves. Both are visible: the owner label in the top bar, and a small <em>quick</em> / <em>deep</em> tag on the note bubble.</div>
+      </section>
+
+      <section id="changes">
+        <div class="eyebrow"><span class="n-badge">4</span>Flow of changes</div>
+        <h2>From a saved file to a flashing item</h2>
+        <p>Every change to the plan, whether the agent wrote it, you flipped a status from the panel, or you edited the file in an editor, takes the same path. The daemon does not trust anyone to declare what changed; it derives the change by comparing the new parse with the last one.</p>
+        <figure class="fig-scroll">
+          <svg viewBox="0 0 960 230" role="img" aria-label="Pipeline: a PLAN.md save is noticed by the watcher, parsed into a model, diffed against the last snapshot, appended to events.jsonl, pushed over the WebSocket, and the browser morphs the board in place.">
+            <defs><marker id="arr3" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="currentColor"/></marker></defs>
+            <g>
+              <rect class="file" x="17" y="40" width="110" height="64" rx="8"/><text class="t-b" x="72" y="68" text-anchor="middle">PLAN.md</text><text x="72" y="88" text-anchor="middle">saved</text>
+              <text class="t-m" x="72" y="128" text-anchor="middle">by the agent,</text><text class="t-m" x="72" y="144" text-anchor="middle">by you, by an editor</text>
+              <line class="flow" x1="127" y1="72" x2="153" y2="72" marker-end="url(#arr3)"/>
+              <rect class="box" x="153" y="40" width="110" height="64" rx="8"/><text class="t-b" x="208" y="68" text-anchor="middle">watcher</text><text x="208" y="88" text-anchor="middle">chokidar</text>
+              <text class="t-m" x="208" y="128" text-anchor="middle">waits 150 ms for the</text><text class="t-m" x="208" y="144" text-anchor="middle">write to settle</text>
+              <line class="flow" x1="263" y1="72" x2="289" y2="72" marker-end="url(#arr3)"/>
+              <rect class="box" x="289" y="40" width="110" height="64" rx="8"/><text class="t-b" x="344" y="68" text-anchor="middle">parse</text><text x="344" y="88" text-anchor="middle">markdown-it</text>
+              <text class="t-m" x="344" y="128" text-anchor="middle">items, ids, statuses,</text><text class="t-m" x="344" y="144" text-anchor="middle">diagrams, HTML</text>
+              <line class="flow" x1="399" y1="72" x2="425" y2="72" marker-end="url(#arr3)"/>
+              <rect class="box-accent" x="425" y="40" width="110" height="64" rx="8"/><text class="t-b" x="480" y="68" text-anchor="middle">diff</text><text x="480" y="88" text-anchor="middle">vs snapshot.json</text>
+              <text class="t-m" x="480" y="128" text-anchor="middle">status flips, added,</text><text class="t-m" x="480" y="144" text-anchor="middle">removed, reworded</text>
+              <line class="flow" x1="535" y1="72" x2="561" y2="72" marker-end="url(#arr3)"/>
+              <rect class="file" x="561" y="40" width="110" height="64" rx="8"/><text class="t-b" x="616" y="68" text-anchor="middle">events.jsonl</text><text x="616" y="88" text-anchor="middle">append</text>
+              <text class="t-m" x="616" y="128" text-anchor="middle">the status history,</text><text class="t-m" x="616" y="144" text-anchor="middle">forever, in git</text>
+              <line class="flow" x1="671" y1="72" x2="697" y2="72" marker-end="url(#arr3)"/>
+              <rect class="box" x="697" y="40" width="110" height="64" rx="8"/><text class="t-b" x="752" y="68" text-anchor="middle">push</text><text x="752" y="88" text-anchor="middle">WebSocket "plan"</text>
+              <text class="t-m" x="752" y="128" text-anchor="middle">to every open tab</text><text class="t-m" x="752" y="144" text-anchor="middle">of this board</text>
+              <line class="flow" x1="807" y1="72" x2="833" y2="72" marker-end="url(#arr3)"/>
+              <rect class="box" x="833" y="40" width="110" height="64" rx="8"/><text class="t-b" x="888" y="68" text-anchor="middle">morph</text><text x="888" y="88" text-anchor="middle">in the browser</text>
+              <text class="t-m" x="888" y="128" text-anchor="middle">fetch state, swap the</text><text class="t-m" x="888" y="144" text-anchor="middle">board, flash, tag</text>
+            </g>
+            <text class="t-m" x="480" y="200" text-anchor="middle">scroll position, selected item and unsent note survive the swap because the page is one document, not a reloaded iframe</text>
+          </svg>
+          <figcaption>Fig. 4 — The change pipeline. The first parse of a plan writes the snapshot and produces no events; from then on every save is compared with the one before.</figcaption>
+        </figure>
+        <h3>What "changed since your last visit" means</h3>
+        <p>The browser heartbeats while the tab is visible. A gap of more than 30 minutes ends a visit. When you come back, everything logged after the previous visit ended is tagged on the items themselves (<em>To do → Done · 2 h ago</em>), counted in the amber chip in the top bar, and grouped in the <em>Changes</em> tab. On the very first visit, and during the current one, the basis is the moment you opened the board, so work the agent does while you watch is tagged too.</p>
+        <p>Because the history is derived, nothing depends on the agent being disciplined about announcing edits. A rewording of an item with a stable id shows as <em>reworded</em>; an item whose id changed shows as removed plus added, which is why <code>planboard lint</code> nags about missing ids.</p>
+
+        <h3>Reviewing the changes: drawn, not listed</h3>
+        <p>The <em>Changes</em> tab turns the same event list into pictures, all computed in the browser from <code>events_since</code>. The key trick is rebuilding each item's status <em>at your last visit</em> from the events after it: the first event of an item tells its old status (the <code>from</code> of a status flip; "not there yet" for an added item), a <code>removed</code> event tells that it is gone now, and an item with no events did not move. With then-and-now known for every item, the rest is arithmetic.</p>
+        <figure class="fig-scroll">
+          <svg viewBox="0 0 960 300" role="img" aria-label="Events since the last visit are replayed per item to rebuild its status then; the result is drawn as two stacked bars, then and now, with a band per movement between them.">
+            <defs>
+              <marker id="arr4b" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="currentColor"/></marker>
+              <pattern id="hatch4b" width="6" height="6" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><rect width="6" height="6" fill="var(--paper)"/><line x1="0" y1="0" x2="0" y2="6" stroke="var(--muted)" stroke-width="2"/></pattern>
+            </defs>
+            <!-- events -->
+            <rect class="file" x="20" y="40" width="270" height="180" rx="8"/>
+            <text class="t-b" x="155" y="66" text-anchor="middle">events_since (events.jsonl)</text>
+            <text class="t-mono" x="36" y="96">status   volunteer-guide    todo → in_progress</text>
+            <text class="t-mono" x="36" y="118">status   volunteer-guide    in_progress → done</text>
+            <text class="t-mono" x="36" y="140">status   m1-readme  in_progress → done</text>
+            <text class="t-mono" x="36" y="162">added    m2-depth   (todo)</text>
+            <text class="t-mono" x="36" y="184">removed  r-old      (blocked)</text>
+            <text class="t-m" x="36" y="208">reworded, diagram_changed … kept for the cards</text>
+            <line class="flow" x1="290" y1="130" x2="330" y2="130" marker-end="url(#arr4b)"/>
+            <!-- rule -->
+            <rect class="box-accent" x="330" y="40" width="270" height="180" rx="8"/>
+            <text class="t-b" x="465" y="66" text-anchor="middle">rebuild "then" per item</text>
+            <text x="346" y="96">first event of an item:</text>
+            <text class="t-mono" x="362" y="116">status  → then = from</text>
+            <text class="t-mono" x="362" y="136">added   → then = not there yet</text>
+            <text class="t-mono" x="362" y="156">removed → now = gone</text>
+            <text x="346" y="184">no event → then = now</text>
+            <text class="t-m" x="346" y="206">changed = then ≠ now</text>
+            <line class="flow" x1="600" y1="130" x2="640" y2="130" marker-end="url(#arr4b)"/>
+            <!-- flow -->
+            <text class="t-m" x="650" y="52">at your last visit</text>
+            <rect x="650" y="60" width="132" height="16" rx="2" fill="var(--muted)" fill-opacity="0.5"/>
+            <rect x="784" y="60" width="66" height="16" rx="2" fill="var(--progress)"/>
+            <rect x="852" y="60" width="66" height="16" rx="2" fill="var(--done)"/>
+            <rect x="920" y="60" width="20" height="16" rx="2" fill="url(#hatch4b)" stroke="var(--muted)" stroke-width="0.6"/>
+            <text class="t-m" x="650" y="200">now</text>
+            <rect x="650" y="204" width="88" height="16" rx="2" fill="var(--muted)" fill-opacity="0.5"/>
+            <rect x="740" y="204" width="66" height="16" rx="2" fill="var(--progress)"/>
+            <rect x="808" y="204" width="110" height="16" rx="2" fill="var(--done)"/>
+            <rect x="920" y="204" width="20" height="16" rx="2" fill="url(#hatch4b)" stroke="var(--muted)" stroke-width="0.6"/>
+            <!-- bands: stayed todo, todo→in_progress, in_progress→done, stayed done, added, removed -->
+            <path d="M650,76 C650,140 650,140 650,204 L738,204 C738,140 738,140 738,76 Z" fill="currentColor" fill-opacity="0.07"/>
+            <path d="M738,76 C738,140 740,140 740,204 L806,204 C806,140 782,140 782,76 Z" fill="var(--progress)" fill-opacity="0.55"/>
+            <path d="M784,76 C784,140 808,140 808,204 L852,204 C852,140 850,140 850,76 Z" fill="var(--done)" fill-opacity="0.55"/>
+            <path d="M852,76 C852,140 852,140 852,204 L918,204 C918,140 918,140 918,76 Z" fill="currentColor" fill-opacity="0.07"/>
+            <path d="M920,76 C920,140 852,140 852,204 L874,204 C874,140 940,140 940,76 Z" fill="var(--done)" fill-opacity="0.35"/>
+            <text class="t-m" x="795" y="248" text-anchor="middle">a band per (then → now) pair · faint = did not move</text>
+            <text class="t-m" x="795" y="266" text-anchor="middle">hatched = not in the plan then / any more</text>
+            <text class="t-m" x="480" y="286" text-anchor="middle">the same rows feed the per-section deltas (done then → done now) and the cards below the chart</text>
+          </svg>
+          <figcaption>Fig. 4b — How the before/now flow is built. Nothing is stored per visit: the bars are replayed from the event log, so they work for any "since" the visit detection produces.</figcaption>
+        </figure>
+        <div class="tbl-scroll">
+        <table>
+          <thead><tr><th>Graphic</th><th>Shows</th><th>Built from</th></tr></thead>
+          <tbody>
+            <tr><td>Flow chart</td><td>statuses then and now as two stacked bars, a band per movement (to do → in progress, in progress → done, added, removed); unchanged items faint</td><td>the rebuilt then/now rows</td></tr>
+            <tr><td>Timeline</td><td>when the changes happened, one dot per minute with changes, sized by count</td><td>event timestamps between <em>since</em> and now</td></tr>
+            <tr><td>Section deltas</td><td>per section: done then → done now, newly done highlighted, started items in amber</td><td>rows grouped by the section they belong to (nested sections roll up)</td></tr>
+            <tr><td>Cards</td><td>one per changed element in plan order: status pills with arrows, <em>added</em> / <em>removed</em> tags, a word diff for rewordings, <em>Show before</em> for diagrams</td><td>events grouped by anchor; the word diff is an LCS over words; <code>diagram_changed</code> events carry the previous Mermaid source, which the board renders in place with a "before" ribbon</td></tr>
+            <tr><td>Walk-through</td><td><span class="kbd">n</span> / <span class="kbd">p</span> or ‹ › step through the cards; the element is rung on the board and scrolled into view</td><td>the card order</td></tr>
+            <tr><td>On the board</td><td>coloured left rail on changed items, dot → dot change tags, stacked status bars in the top bar and section headers, a minimap <em>ruler</em> of changes and notes along the right edge</td><td>the same events plus the thread summary</td></tr>
+          </tbody>
+        </table>
+        </div>
+        <h3>Working the board</h3>
+        <p>Three filters (<b>Open</b>, <b>Changed</b>, <b>With notes</b>) combine and hide everything else, dimming sections left empty. Sections that are 100 % done fold to their heading, unfold with a chevron or <b>Expand done</b>, and unfold by themselves when you select something inside. The keyboard covers the review: <span class="kbd">j</span>/<span class="kbd">k</span> move, <span class="kbd">Enter</span> opens the thread, <span class="kbd">Esc</span> goes back, <span class="kbd">o</span>/<span class="kbd">c</span>/<span class="kbd">t</span> toggle filters, <span class="kbd">1</span>/<span class="kbd">2</span>/<span class="kbd">3</span> switch tabs, <span class="kbd">?</span> lists them. Under 900 px the panel becomes a bottom sheet with a handle.</p>
+      </section>
+
+      <section id="anchors">
+        <div class="eyebrow"><span class="n-badge">5</span>Anchors and notes</div>
+        <h2>What a click becomes</h2>
+        <p>A note is text plus an anchor. The anchor is what you clicked, reduced to a fixed shape the daemon validates before storing. Threads are grouped by anchor, so all notes about one item, from either side, sit together.</p>
+        <div class="tbl-scroll">
+        <table>
+          <thead><tr><th>You click</th><th>Anchor stored</th><th>The agent receives in addition</th></tr></thead>
+          <tbody>
+            <tr><td>an item</td><td><code>{"type":"item","item":"site-soil"}</code></td><td>the item's current text, status, section and line</td></tr>
+            <tr><td>a heading</td><td><code>{"type":"section","section":"volunteers"}</code></td><td>the section title and line</td></tr>
+            <tr><td>a diagram node</td><td><code>{"type":"node","diagram":"loop","node":"S","label":"planboard server"}</code></td><td>the diagram's Mermaid source</td></tr>
+            <tr><td>the diagram itself</td><td><code>{"type":"diagram","diagram":"loop"}</code></td><td>the diagram's Mermaid source</td></tr>
+            <tr><td>a point on an image</td><td><code>{"type":"image","src":"docs/board.jpg","x":0.499,"y":0.5}</code></td><td>the pin is drawn at that fraction of the image</td></tr>
+            <tr><td>selected text</td><td><code>{"type":"text","item":"volunteer-guide","quote":"Draft a one-page…"}</code></td><td>the quote, and the item or section it sits in</td></tr>
+            <tr><td>nothing in particular</td><td><code>{"type":"board"}</code></td><td>the note is about the plan as a whole</td></tr>
+            <tr><td colspan="3" style="color:var(--muted)">Every user note also carries <code>"depth"</code> (quick · normal · deep), optional <code>"attachments"</code> (files under <code>PLAN.board/attachments/</code>, delivered to the agent as absolute paths with type and size) and, for whiteboard sketches, <code>"kind": "sketch"</code>.</td></tr>
+          </tbody>
+        </table>
+        </div>
+        <figure class="fig-scroll">
+          <svg viewBox="0 0 760 190" role="img" aria-label="Note states: Add note creates a queued note; Send makes it sent; a written poll response makes it delivered; a lost response restores it to sent; agent replies arrive delivered; only queued notes can be removed.">
+            <defs><marker id="arr4" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="currentColor"/></marker></defs>
+            <line class="flow" x1="10" y1="85" x2="60" y2="85" marker-end="url(#arr4)"/><text class="t-m" x="34" y="72" text-anchor="middle">Add note</text>
+            <rect class="box" x="60" y="60" width="160" height="50" rx="25" style="stroke-dasharray:6 4"/><text class="t-b" x="140" y="90" text-anchor="middle">queued</text>
+            <line class="flow" x1="220" y1="85" x2="300" y2="85" marker-end="url(#arr4)"/><text class="t-m" x="260" y="72" text-anchor="middle">Send</text>
+            <rect class="box" x="300" y="60" width="160" height="50" rx="25"/><text class="t-b" x="380" y="90" text-anchor="middle">sent</text>
+            <line class="flow" x1="460" y1="85" x2="540" y2="85" marker-end="url(#arr4)"/><text class="t-m" x="500" y="72" text-anchor="middle">poll response</text><text class="t-m" x="500" y="126" text-anchor="middle">written</text>
+            <rect class="box-accent" x="540" y="60" width="160" height="50" rx="25"/><text class="t-b" x="620" y="90" text-anchor="middle">delivered</text>
+            <path class="flow" d="M 600 110 C 600 160, 400 160, 384 116" marker-end="url(#arr4)"/><text class="t-m" x="492" y="168" text-anchor="middle">response lost → restored, re-delivered next poll</text>
+            <line class="flow" x1="620" y1="12" x2="620" y2="58" marker-end="url(#arr4)"/><text class="t-m" x="620" y="30" text-anchor="start" dx="8">agent replies arrive here directly</text>
+            <line class="flow" x1="140" y1="110" x2="140" y2="150" marker-end="url(#arr4)"/><text class="t-m" x="140" y="168" text-anchor="middle">× remove (only while queued)</text>
+          </svg>
+          <figcaption>Fig. 5 — A user note's life. The dashed bubble in the panel is <em>queued</em>; "waiting for agent" is <em>sent</em>; a plain bubble is <em>delivered</em>.</figcaption>
+        </figure>
+        <h3>What the agent actually sees</h3>
+        <p>This synthetic poll response illustrates an item note and a sketch note. The <code>thread</code> array holds everything already said about that anchor, so the agent never has to scroll.</p>
+<pre><code>{
+  "status": "feedback",
+  "plan": { "path": "/example/garden/PLAN.md", "title": "Community garden launch",
+            "counts": { "total": 12, "done": 2, "in_progress": 1, "blocked": 1, "question": 1, "todo": 6, "dropped": 1 } },
+  "notes": [
+    {
+      "id": "n_example1",
+      "at": "2026-01-01T10:00:00.000Z",
+      "depth": "normal",
+      "anchor": { "type": "item", "item": "volunteer-time" },
+      "label": "Welcome volunteers › Choose a morning or afternoon orientation",
+      "text": "Could we offer an afternoon orientation?",
+      "item": { "id": "volunteer-time", "status": "question", "section": "volunteers", "line": 20,
+                "text": "Choose a morning or afternoon orientation" },
+      "thread": []
+    },
+    {
+      "id": "n_example2", "at": "2026-01-01T10:05:00.000Z", "depth": "normal", "kind": "sketch",
+      "anchor": { "type": "diagram", "diagram": "journey" }, "label": "diagram journey",
+      "text": "Add a reminder before orientation\n\nWhiteboard edits on diagram `journey` (1 added):\n- Added rectangle \"Reminder\"",
+      "attachments": [
+        { "file": "sketch-journey_example.png", "path": "/example/garden/PLAN.board/attachments/sketch-journey_example.png", "type": "image/png", "bytes": 48213 },
+        { "file": "sketch-journey_scene.excalidraw", "path": "/example/garden/PLAN.board/attachments/sketch-journey_scene.excalidraw", "type": "application/vnd.excalidraw+json", "bytes": 9120 }
+      ],
+      "diagram": { "id": "journey", "line": 30, "source": "flowchart LR\n  R[Register] --> W[Read welcome guide] …" },
+      "thread": []
+    }
+  ],
+  "next_step": "Read each note and its thread, inspect attachments, edit the plan, reply to each note, then poll again during the active review."
+}</code></pre>
+      </section>
+
+      <section id="attach">
+        <div class="eyebrow"><span class="n-badge">6</span>Screenshots and the whiteboard</div>
+        <h2>Pictures travel as files beside the plan</h2>
+        <p>Two kinds of pictures reach the agent. A <b>screenshot</b> you paste, drop or pick with 📎 is uploaded as raw bytes, stored under <code>PLAN.board/attachments/</code> with a fresh name, and referenced from the note by file name; the thread shows it, the poll hands the agent the absolute path, and the guidance tells it to look before answering. A <b>whiteboard sketch</b> is the same thing produced by an editor.</p>
+        <figure class="fig-scroll">
+          <svg viewBox="0 0 960 120" role="img" aria-label="Pipeline: paste or drop a screenshot, the browser posts the bytes, the daemon stores them in PLAN.board/attachments, the note references the file, the thread shows it and the poll delivers the path to the agent.">
+            <defs><marker id="arr6a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="currentColor"/></marker></defs>
+            <rect class="box" x="16" y="30" width="150" height="56" rx="8"/><text class="t-b" x="91" y="54" text-anchor="middle">paste · drop · 📎</text><text class="t-m" x="91" y="74" text-anchor="middle">png · jpeg · gif · webp</text>
+            <line class="flow" x1="166" y1="58" x2="200" y2="58" marker-end="url(#arr6a)"/>
+            <rect class="box" x="200" y="30" width="170" height="56" rx="8"/><text class="t-mono" x="285" y="54" text-anchor="middle">POST /api/attachments</text><text class="t-m" x="285" y="74" text-anchor="middle">raw bytes, ≤ 12 MB</text>
+            <line class="flow" x1="370" y1="58" x2="404" y2="58" marker-end="url(#arr6a)"/>
+            <rect class="file" x="404" y="30" width="190" height="56" rx="8"/><text class="t-mono" x="499" y="54" text-anchor="middle">attachments/a_x7k2.png</text><text class="t-m" x="499" y="74" text-anchor="middle">committed with the sidecar</text>
+            <line class="flow" x1="594" y1="58" x2="628" y2="58" marker-end="url(#arr6a)"/>
+            <rect class="box" x="628" y="30" width="150" height="56" rx="8"/><text class="t-b" x="703" y="54" text-anchor="middle">note.attachments</text><text class="t-m" x="703" y="74" text-anchor="middle">shown in the thread</text>
+            <line class="flow-acc" x1="778" y1="58" x2="812" y2="58" marker-end="url(#arr6a)"/>
+            <rect class="box-accent" x="812" y="30" width="134" height="56" rx="8"/><text class="t-b" x="879" y="54" text-anchor="middle">poll JSON</text><text class="t-m" x="879" y="74" text-anchor="middle">path · type · bytes</text>
+          </svg>
+          <figcaption>Fig. 6a — A screenshot's path to the agent. Removing a still-queued note deletes files nothing else references.</figcaption>
+        </figure>
+        <h3>The whiteboard is lavish-axi's frame, spoken to over postMessage</h3>
+        <p>Every Mermaid diagram has a <b>✎ Whiteboard</b> button. It opens an overlay with an iframe that loads lavish-axi's prebuilt Excalidraw frame (copied at build time from the <code>lavish-axi</code> package into <code>dist/whiteboard/</code>, ~8 MB, served at <code>/whiteboard-assets/</code>). The frame converts the Mermaid source to an editable scene, autosaves while you draw, and on <b>Queue feedback</b> hands back a PNG and a list of what you added, removed, moved or relabeled. planboard turns that into a queued note on the diagram - the summary as text, the PNG and the <code>.excalidraw</code> scene as attachments - which you send like any other. The agent reads the list, looks at the picture, and rewrites the Mermaid.</p>
+        <figure class="fig-scroll">
+          <svg viewBox="0 0 960 470" role="img" aria-label="Sequence: the board opens the frame; the frame says ready; the board fetches the saved scene and sends init with the Mermaid source; the frame converts it; autosaves go to PLAN.board/whiteboards; Queue feedback posts the PNG and summary; the daemon stores them as attachments and queues a sketch note; the board shows it and closes the overlay.">
+            <defs>
+              <marker id="arr6b" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="currentColor"/></marker>
+              <marker id="arr6b-acc" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="var(--accent)"/></marker>
+            </defs>
+            <rect class="box" x="40" y="16" width="220" height="36" rx="8"/><text class="t-b" x="150" y="40" text-anchor="middle">Board page (host)</text>
+            <rect class="box-soft" x="370" y="16" width="220" height="36" rx="8"/><text class="t-b" x="480" y="40" text-anchor="middle">Excalidraw frame (lavish)</text>
+            <rect class="box-accent" x="700" y="16" width="220" height="36" rx="8"/><text class="t-b" x="810" y="40" text-anchor="middle">planboard daemon</text>
+            <line class="lifeline" x1="150" y1="52" x2="150" y2="450"/>
+            <line class="lifeline" x1="480" y1="52" x2="480" y2="450"/>
+            <line class="lifeline" x1="810" y1="52" x2="810" y2="450"/>
+            <line class="flow" x1="150" y1="90" x2="480" y2="90" marker-end="url(#arr6b)"/>
+            <text class="t-m t-mono" x="315" y="82" text-anchor="middle">&lt;iframe src="/whiteboard-frame?diagramId=loop"&gt;</text>
+            <line class="flow" x1="480" y1="125" x2="150" y2="125" marker-end="url(#arr6b)"/>
+            <text class="t-m t-mono" x="315" y="117" text-anchor="middle">lavish-whiteboard:ready</text>
+            <line class="flow-acc" x1="150" y1="160" x2="810" y2="160" marker-end="url(#arr6b-acc)"/>
+            <text class="t-acc t-mono" x="480" y="152" text-anchor="middle">GET /api/whiteboard/loop → { source, whiteboard (saved scene or null) }</text>
+            <line class="flow" x1="150" y1="200" x2="480" y2="200" marker-end="url(#arr6b)"/>
+            <text class="t-m t-mono" x="315" y="192" text-anchor="middle">init { source, sourceHash, saved, theme }</text>
+            <text class="t-m" x="480" y="228" text-anchor="middle">mermaid → excalidraw, or restore the saved scene</text>
+            <text class="t-m" x="480" y="244" text-anchor="middle">(a stale save vs a changed diagram asks you: re-convert or keep)</text>
+            <line class="flow-push" x1="480" y1="275" x2="150" y2="275" marker-end="url(#arr6b)"/>
+            <text class="t-m t-mono" x="315" y="267" text-anchor="middle">save { scene, baseline }  (800 ms debounce)</text>
+            <line class="flow-push" x1="150" y1="275" x2="810" y2="275" marker-end="url(#arr6b)" transform="translate(0,20)"/>
+            <text class="t-m t-mono" x="645" y="287" text-anchor="middle">PUT /api/whiteboard/loop → whiteboards/loop.json (git-ignored)</text>
+            <line class="flow" x1="480" y1="335" x2="150" y2="335" marker-end="url(#arr6b)"/>
+            <text class="t-m t-mono" x="315" y="327" text-anchor="middle">queueFeedback { note, summaryLines, stats, pngDataUrl, scene }</text>
+            <line class="flow-acc" x1="150" y1="365" x2="810" y2="365" marker-end="url(#arr6b-acc)"/>
+            <text class="t-acc t-mono" x="480" y="357" text-anchor="middle">POST /api/whiteboard/loop/feedback</text>
+            <text class="t-m" x="810" y="392" text-anchor="end">writes attachments/sketch-loop_*.png + .excalidraw,</text>
+            <text class="t-m" x="810" y="408" text-anchor="end">queues a "sketch" note on the diagram, pushes "notes"</text>
+            <line class="flow" x1="150" y1="430" x2="480" y2="430" marker-end="url(#arr6b)"/>
+            <text class="t-m t-mono" x="315" y="422" text-anchor="middle">queueResult { ok }  → overlay closes, thread shows the sketch</text>
+            <text class="t-m" x="150" y="462" text-anchor="middle">you press Send as usual</text>
+          </svg>
+          <figcaption>Fig. 6b — One whiteboard session. The frame never talks to the daemon; the board page relays, exactly as lavish's own chrome does. Closing the overlay first asks the frame to flush its autosave.</figcaption>
+        </figure>
+        <div class="callout">The frame is loaded same-origin, without a sandbox, because the Mermaid it converts comes from your own plan file - the same trust the board already extends to the plan's HTML. A missing bundle simply removes the button.</div>
+      </section>
+
+      <section id="files">
+        <div class="eyebrow"><span class="n-badge">7</span>Files, export, commits</div>
+        <h2>Where things live</h2>
+        <div class="tbl-scroll">
+        <table>
+          <thead><tr><th>Path</th><th>Holds</th><th>Commit?</th></tr></thead>
+          <tbody>
+            <tr><td><code>PLAN.md</code></td><td>the plan; the only thing the agent edits</td><td><span class="pill done">yes</span></td></tr>
+            <tr><td><code>PLAN.board/notes.json</code></td><td>every note and reply with its anchor and state; rewritten atomically on change</td><td><span class="pill done">yes</span></td></tr>
+            <tr><td><code>PLAN.board/events.jsonl</code></td><td>the derived status history, append-only</td><td><span class="pill done">yes</span></td></tr>
+            <tr><td><code>PLAN.board/snapshot.json</code></td><td>the last parse (items, sections, diagram sources), so the diff continues after a move to another machine</td><td><span class="pill done">yes</span></td></tr>
+            <tr><td><code>PLAN.board/attachments/</code></td><td>pasted screenshots (<code>a_*.png</code>) and whiteboard sketches (<code>sketch-&lt;diagram&gt;_*.png</code> + <code>.excalidraw</code>), referenced from notes by file name</td><td><span class="pill done">yes</span></td></tr>
+            <tr><td><code>PLAN.board/whiteboards/</code></td><td>the autosaved working scene per diagram, rewritten on every stroke</td><td><span class="pill blocked">no</span> ignored by the sidecar's <code>.gitignore</code></td></tr>
+            <tr><td><code>PLAN.board/visits.json</code></td><td>this machine's last-seen timestamps; changes on every heartbeat</td><td><span class="pill blocked">no</span> ignored by <code>PLAN.board/.gitignore</code>, which planboard writes</td></tr>
+            <tr><td><code>~/.planboard/</code></td><td><code>server.json</code> (running daemon), <code>boards.json</code> (known plans), <code>server.log</code></td><td><span class="pill">machine-local</span></td></tr>
+          </tbody>
+        </table>
+        </div>
+        <p>The sidecar can be versioned with the plan to retain project discussion and status history. Machine-local visit timestamps and autosaved working scenes are excluded by its <code>.gitignore</code>. <code>PLANBOARD_STATE_DIR</code> can keep sidecars under a separate root, keyed by a hash of each plan path. The shipped example has an empty conversation and history.</p>
+        <h3>Export for project records</h3>
+        <p><code>planboard export PLAN.md --out notes/plan-with-threads.md</code> (or the <b>Export</b> button in the top bar) writes one Markdown file: the plan as it is, with every thread folded in as a blockquote right under the item, heading, diagram or image it was about - who said what, when, at which depth, with attachments linked relative to the plan - then notes on the whole plan, threads on elements that no longer exist, and the status history by day. It reads without planboard, and it still parses as the same plan.</p>
+      </section>
+
+      <section id="trust">
+        <div class="eyebrow"><span class="n-badge">8</span>Trust boundary</div>
+        <h2>What the daemon believes, and whom</h2>
+        <p>A note is an instruction your agent will act on, and the asset route serves files. That makes the daemon a target worth guarding even on one machine.</p>
+        <ul>
+          <li><b>Loopback by default.</b> The daemon binds <code>127.0.0.1</code>. <code>PLANBOARD_HOST=0.0.0.0</code> is what the sandbox needs so your Mac can reach <code>192.168.65.3:4747</code>; the CLI prints a warning whenever it binds beyond loopback.</li>
+          <li><b>Host allowlist.</b> Requests whose <code>Host</code> is not loopback, a bound address, or a local interface address are refused with 403. This is the defence against DNS rebinding, where a web page you visit resolves its own domain to 127.0.0.1 and talks to the daemon as if it were you.</li>
+          <li><b>Origin guard.</b> Any state-changing request that carries a foreign <code>Origin</code> is refused; the CLI's header-less requests still pass.</li>
+          <li><b>Asset confinement.</b> Images are served only from the plan's directory, checked both lexically and after resolving symlinks, so a link placed beside the plan cannot expose a file elsewhere.</li>
+          <li><b>Anchors are validated,</b> the plan's own HTML is not. Raw HTML in PLAN.md renders as written, because the file is yours and your agent's. A plan copied from a stranger could carry script.</li>
+        </ul>
+      </section>
+
+      <section id="setup">
+        <div class="eyebrow"><span class="n-badge">9</span>Setting up an agent</div>
+        <h2>One command contract, host-specific polling</h2>
+        <div class="grid2">
+          <div class="card">
+            <h4>Claude Code</h4>
+            <p><code>planboard setup claude --global</code> writes <code>~/.claude/skills/planboard/SKILL.md</code>, a stub that appears as <span class="kbd">/planboard</span> and points at <code>planboard --help</code>. Add <code>--hook</code> for a SessionStart hook that lists open boards and pending notes at the start of every session.</p>
+          </div>
+          <div class="card">
+            <h4>Cursor</h4>
+            <p>Inside a project, <code>planboard setup cursor</code> writes <code>.cursor/skills/planboard/SKILL.md</code> and a project rule <code>.cursor/rules/planboard.mdc</code> that Cursor applies when the conversation is about the plan. <code>--agents-md</code> appends a short section to <code>AGENTS.md</code>.</p>
+          </div>
+          <div class="card">
+            <h4>Codex</h4>
+            <p><code>planboard setup codex</code> writes <code>.agents/skills/planboard/SKILL.md</code>; <code>--global</code> uses <code>~/.agents/skills/planboard/SKILL.md</code>. Invoke <span class="kbd">$planboard</span> in the CLI or IDE, or select the skill in the app. The skill opens the board, uses bounded polls, edits the plan, replies on the board, and continues the active review. It collects a yielded shell session before starting another poll and stops on an intended handoff or closed board.</p>
+            <p>These paths and the YAML <code>name</code>/<code>description</code> header follow the <a href="https://learn.chatgpt.com/docs/build-skills">official skill conventions</a>. Existing <a href="https://learn.chatgpt.com/docs/agent-configuration/agents-md">AGENTS.md project instructions</a> and Codex configuration remain unchanged. If discovery does not refresh, restart Codex.</p>
+          </div>
+          <div class="card">
+            <h4>From the sandbox to the Mac</h4>
+            <p>The VM is a separate machine on a private network. Start with <code>PLANBOARD_HOST=0.0.0.0 planboard PLAN.md --no-open</code> and open <code>http://192.168.65.3:4747/</code> in Safari; the home page lists every board. Store the plan on a persistent volume if the VM is disposable.</p>
+          </div>
+          <div class="card">
+            <h4>On the Mac itself</h4>
+            <p><code>npm install && npm run build && npm link</code> in the repo puts <code>planboard</code> on your path; the browser opens by itself on loopback. One daemon serves every plan on the machine; <code>planboard boards</code> lists them.</p>
+          </div>
+        </div>
+      </section>
+
+      <section id="lineage">
+        <div class="eyebrow"><span class="n-badge">10</span>Lineage</div>
+        <h2>What came from lavish-axi, and what did not</h2>
+        <p>lavish-axi is the tool you pointed at: an agent-operated review loop for HTML artifacts. planboard re-implements its proven mechanics in a plan-centric shape instead of forking its 26k lines, and credits it in <code>THIRD-PARTY-NOTICES.md</code>.</p>
+        <div class="tbl-scroll">
+        <table>
+          <thead><tr><th>Aspect</th><th>lavish-axi</th><th>planboard</th></tr></thead>
+          <tbody>
+            <tr><td>Artifact</td><td>any HTML the agent writes, in a sandboxed iframe</td><td>Markdown plan, fixed renderer, one document</td></tr>
+            <tr><td>Conversation</td><td>one linear chat per session</td><td>threads per anchor, plus an activity view</td></tr>
+            <tr><td>Status</td><td>whatever the agent styles</td><td>checkbox characters, counted and diffed</td></tr>
+            <tr><td>History</td><td>opt-in revision legend the agent declares</td><td>derived by diffing saves; "since your last visit"</td></tr>
+            <tr><td>Anchors</td><td>structural CSS paths, text ranges, Mermaid node ids</td><td>stable <code>{#id}</code>, Mermaid node ids, image points, quotes</td></tr>
+            <tr><td>Long poll, at-least-once delivery, queue-then-send, presence, Host and Origin guards, skill-as-stub</td><td colspan="2">borrowed as designed</td></tr>
+            <tr><td>Whiteboard editing of diagrams</td><td>Excalidraw frame, built in</td><td>the same built frame, embedded; planboard speaks its host protocol and stores the result as a sketch note</td></tr>
+            <tr><td>Attachments</td><td>content-addressed store, attached to the chat</td><td>files beside the plan, attached to the note, delivered as paths</td></tr>
+            <tr><td>Reviewing changes</td><td>revision legend the agent declares</td><td>drawn from the derived history: flow, timeline, section deltas, diffs, before/after diagrams</td></tr>
+          </tbody>
+        </table>
+        </div>
+      </section>
+    </main>
+  </div>
+</div>

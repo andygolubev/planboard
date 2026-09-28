@@ -1,0 +1,42 @@
+{
+  "name": "planboard",
+  "version": "0.2.0",
+  "description": "A whiteboard for AI-agent plans: a Markdown plan rendered as a live board you can click, annotate and discuss item by item while the agent works.",
+  "type": "module",
+  "bin": {
+    "planboard": "bin/planboard.js"
+  },
+  "files": [
+    "bin",
+    "src",
+    "dist",
+    "skills",
+    "README.md",
+    "LICENSE",
+    "THIRD-PARTY-NOTICES.md"
+  ],
+  "scripts": {
+    "build": "node scripts/build.js",
+    "test": "node --test test/",
+    "start": "node bin/planboard.js",
+    "prepare": "node scripts/build.js",
+    "screenshots": "node scripts/screenshots.js"
+  },
+  "engines": {
+    "node": ">=22"
+  },
+  "dependencies": {
+    "chokidar": "^4.0.3",
+    "express": "^5.1.0",
+    "markdown-it": "^14.1.0",
+    "open": "^10.1.2",
+    "ws": "^8.18.0"
+  },
+  "devDependencies": {
+    "esbuild": "^0.25.0",
+    "lavish-axi": "^0.1.78",
+    "mermaid": "^11.12.0",
+    "playwright": "^1.63.0"
+  },
+  "license": "MIT"
+}

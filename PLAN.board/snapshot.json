@@ -1,0 +1,109 @@
+{
+  "items": [
+    {
+      "id": "site-map",
+      "status": "done",
+      "text": "Map the planting beds and walking paths",
+      "section": "site"
+    },
+    {
+      "id": "site-soil",
+      "status": "in_progress",
+      "text": "Prepare soil and label each planting bed",
+      "section": "site"
+    },
+    {
+      "id": "site-water",
+      "status": "todo",
+      "text": "Install a water station near the entrance",
+      "section": "site"
+    },
+    {
+      "id": "volunteer-guide",
+      "status": "done",
+      "text": "Draft a one-page welcome guide",
+      "section": "volunteers"
+    },
+    {
+      "id": "volunteer-form",
+      "status": "todo",
+      "text": "Publish the registration form",
+      "section": "volunteers"
+    },
+    {
+      "id": "volunteer-access",
+      "status": "todo",
+      "text": "Add an optional accessibility request field",
+      "section": "volunteers"
+    },
+    {
+      "id": "volunteer-time",
+      "status": "question",
+      "text": "Choose a morning or afternoon orientation",
+      "section": "volunteers"
+    },
+    {
+      "id": "planting-supplies",
+      "status": "todo",
+      "text": "Pack seeds, gloves, and hand tools",
+      "section": "planting"
+    },
+    {
+      "id": "planting-compost",
+      "status": "blocked",
+      "text": "Confirm the compost delivery date",
+      "section": "planting"
+    },
+    {
+      "id": "planting-greenhouse",
+      "status": "dropped",
+      "text": "Build a greenhouse in the first season",
+      "section": "planting"
+    },
+    {
+      "id": "review-tasks",
+      "status": "todo",
+      "text": "Check that every task has a clear completion condition",
+      "section": "review"
+    },
+    {
+      "id": "review-time",
+      "status": "todo",
+      "text": "Resolve the orientation time before publishing registration",
+      "section": "review"
+    }
+  ],
+  "sections": [
+    {
+      "id": "plan",
+      "title": "Community garden launch"
+    },
+    {
+      "id": "site",
+      "title": "Prepare the site"
+    },
+    {
+      "id": "volunteers",
+      "title": "Welcome volunteers"
+    },
+    {
+      "id": "planting",
+      "title": "Planting day"
+    },
+    {
+      "id": "journey",
+      "title": "Volunteer journey"
+    },
+    {
+      "id": "review",
+      "title": "Review checklist"
+    }
+  ],
+  "diagrams": [
+    {
+      "id": "journey",
+      "hash": "c338742517c8",
+      "source": "flowchart LR\n  R[Register] --> W[Read welcome guide]\n  W --> O[Attend orientation]\n  O --> P[Plant a garden bed]"
+    }
+  ]
+}
