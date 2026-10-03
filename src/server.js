@@ -608,6 +608,7 @@ function renderBoardPage(board) {
 </header>
 <div class="layout" id="layout">
   <nav class="contents" aria-label="Plan contents"><div class="contents-title">Contents</div><div id="contentsLinks"></div></nav>
+  <div class="panel-resizer" data-resize-panel="left" role="separator" tabindex="0" aria-label="Resize contents" aria-orientation="vertical" title="Drag to resize contents. Use arrow keys when focused; double-click to reset."></div>
   <div class="board-wrap">
     <div class="toolbar" id="toolbar" hidden>
       <span class="spacer"></span>
@@ -616,6 +617,7 @@ function renderBoardPage(board) {
     <main id="board" class="board"></main>
     <div class="ruler" id="ruler" title="Where the changes and notes are - click to jump"></div>
   </div>
+  <div class="panel-resizer" data-resize-panel="right" role="separator" tabindex="0" aria-label="Resize discussion" aria-controls="panel" aria-orientation="vertical" title="Drag to resize discussion. Use arrow keys when focused; double-click to reset."></div>
   <aside class="panel" id="panel">
     <button type="button" class="sheet-handle" id="sheetHandle" aria-label="Open the notes panel"><span class="sheet-grip"></span><span class="sheet-title" id="sheetTitle">Whole plan</span><span class="sheet-badge" id="sheetBadge" hidden></span></button>
     <div class="panel-head">

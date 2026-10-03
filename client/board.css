@@ -2157,3 +2157,15 @@ body.wb-open {
   .board-wrap { flex: 1; height: auto; }
   .board { padding: 16px 12px 140px; }
 }
+
+/* Adjustable desktop panels; preserve the existing stacked mobile layout. */
+@media (min-width: 901px) {
+  .layout { grid-template-columns: var(--contents-width, 210px) 6px minmax(0, 1fr) 6px var(--discussion-width, 360px); }
+  .panel { min-width: 0; }
+}
+.panel-resizer { cursor: col-resize; touch-action: none; background: var(--bg); position: relative; z-index: 3; }
+.panel-resizer::after { content: ""; position: absolute; inset: 0 2px; background: var(--line); transition: background .15s; }
+.panel-resizer:hover::after, .panel-resizer:focus-visible::after { background: var(--accent); }
+.panel-resizer:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+.resizing-panels, .resizing-panels * { cursor: col-resize !important; user-select: none !important; }
+@media (max-width: 900px) { .panel-resizer { display: none; } }

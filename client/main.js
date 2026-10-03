@@ -7,6 +7,7 @@ import { renderChangesPanel, changeGroups } from "./changes.js";
 import { STATUS_ORDER, ago, anchorKeyOf, clock, cssEscape, dayLabel, describeEvent as describeEv, esc, eventKey, fileSize } from "./util.js";
 import { createWhiteboardHost } from "./whiteboard.js";
 import { numberedSections } from "./outline.js";
+import { setupPanelResize } from "./resize.js";
 
 const bootEl = document.getElementById("planboard-state");
 let state = JSON.parse(bootEl.textContent);
@@ -512,6 +513,7 @@ function updateRulerViewport() {
 }
 boardEl.addEventListener("scroll", () => requestAnimationFrame(updateRulerViewport), { passive: true });
 window.addEventListener("resize", () => requestAnimationFrame(renderRuler));
+setupPanelResize($("#layout"), { load: loadJson, save: saveJson, onResize: () => requestAnimationFrame(renderRuler) });
 window.matchMedia("(max-width: 900px)").addEventListener("change", () => {
   renderTopbar();
   if (!isPhone()) openSheet(false);
