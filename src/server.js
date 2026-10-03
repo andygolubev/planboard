@@ -621,7 +621,7 @@ function renderBoardPage(board) {
   </div>
   <div class="panel-resizer" data-resize-panel="right" role="separator" tabindex="0" aria-label="Resize discussion" aria-controls="panel" aria-orientation="vertical" title="Drag to resize discussion. Use arrow keys when focused; double-click to reset."></div>
   <aside class="panel" id="panel">
-    <button type="button" class="sheet-handle" id="sheetHandle" aria-label="Open the notes panel"><span class="sheet-grip"></span><span class="sheet-title" id="sheetTitle">Whole plan</span><span class="sheet-badge" id="sheetBadge" hidden></span></button>
+    <button type="button" class="sheet-handle" id="sheetHandle" aria-label="Open the notes panel"><span class="sheet-grip"></span><span class="sheet-title" id="sheetTitle">Plan</span><span class="sheet-badge" id="sheetBadge" hidden></span></button>
     <div class="panel-head">
       <div class="panel-context" id="panelContext"></div>
       <nav class="tabs" id="tabs">
@@ -657,7 +657,7 @@ function renderBoardPage(board) {
     <dl>
       <dt>j / k</dt><dd>next / previous item</dd>
       <dt>Enter</dt><dd>open the item's thread and write</dd>
-      <dt>Esc</dt><dd>back to the whole plan (closes overlays first)</dd>
+      <dt>Esc</dt><dd>back to the plan (closes overlays first)</dd>
       <dt>n / p</dt><dd>next / previous change since your last visit</dd>
       <dt>1 · 2 · 3</dt><dd>Thread · Activity · Changes tab</dd>
       <dt>?</dt><dd>this help</dd>

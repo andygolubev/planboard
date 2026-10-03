@@ -42,7 +42,7 @@ const sheetBadge = $("#sheetBadge");
 const helpOverlay = $("#helpOverlay");
 
 let selection = { type: "board" };
-let selectionLabel = "Whole plan";
+let selectionLabel = "Plan";
 let tab = "thread";
 let since = state.since || null;
 let sinceBasis = state.since_basis || "open";
@@ -89,7 +89,7 @@ function sectionById(id) {
 }
 
 function labelFor(anchor) {
-  if (!anchor || anchor.type === "board") return "Whole plan";
+  if (!anchor || anchor.type === "board") return "Plan";
   switch (anchor.type) {
     case "item":
     case "text": {
@@ -103,7 +103,7 @@ function labelFor(anchor) {
         const sec = sectionById(anchor.section);
         return sec ? sec.title : anchor.section;
       }
-      return "Whole plan";
+      return "Plan";
     }
     case "section": {
       const sec = sectionById(anchor.section);
@@ -885,8 +885,8 @@ function renderContext() {
   const a = selection;
   const parts = [];
   const isBoard = !a || a.type === "board";
-  parts.push(`<div class="ctx-row"><span class="ctx-kind">${esc(kindLabel(a))}</span>${isBoard ? "" : `<button type="button" class="ctx-clear" id="ctxClear" title="Back to the whole plan (Esc)">×</button>`}</div>`);
-  parts.push(`<div class="ctx-label" title="${esc(selectionLabel)}">${esc(selectionLabel)}</div>`);
+  parts.push(`<div class="ctx-row"><span class="ctx-kind">${esc(kindLabel(a))}</span>${isBoard ? "" : `<button type="button" class="ctx-clear" id="ctxClear" title="Back to the plan (Esc)">×</button>`}</div>`);
+  if (!isBoard) parts.push(`<div class="ctx-label" title="${esc(selectionLabel)}">${esc(selectionLabel)}</div>`);
   if (a.type === "item" || (a.type === "text" && a.item)) {
     const it = itemById(a.item);
     if (it) {
@@ -975,7 +975,7 @@ function renderThread() {
   const key = anchorKeyOf(selection);
   const notes = (state.notes || []).filter((n) => anchorKeyOf(n.anchor) === key);
   if (!notes.length) {
-    panelScroll.innerHTML = `<div class="empty">${key === "board" ? "No notes on the whole plan yet. Click an item, heading, diagram node or image on the board to talk about it, or write here for the plan as a whole." : "Nothing said about this yet. Write the first note below."}</div>`;
+    panelScroll.innerHTML = `<div class="empty">${key === "board" ? "No notes on the plan yet. Click an item, heading, diagram node or image on the board to talk about it, or write here to discuss the plan." : "Nothing said about this yet. Write the first note below."}</div>`;
     return;
   }
   panelScroll.innerHTML = notes.map((n) => noteBubble(n)).join("");
@@ -1212,7 +1212,7 @@ function renderTopbar() {
   if (n) {
     changesChip.hidden = false;
     const long = sinceBasis === "visit" && since ? `${n} change${n === 1 ? "" : "s"} since your last visit (${ago(since)})` : `${n} change${n === 1 ? "" : "s"} since you opened the board`;
-    changesChip.textContent = isPhone() ? `${n} change${n === 1 ? "" : "s"}` : long;
+    changesChip.textContent = `${n} change${n === 1 ? "" : "s"}`;
     changesChip.title = long;
   } else changesChip.hidden = true;
   renderPresence();

@@ -123,6 +123,9 @@ pre {
   background: var(--done);
 }
 .changes-chip {
+  flex: none;
+  white-space: nowrap;
+  line-height: 1.4;
   border: 1px solid var(--progress);
   color: var(--progress);
   background: transparent;
