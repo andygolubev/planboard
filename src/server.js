@@ -607,10 +607,11 @@ function renderBoardPage(board) {
   <div class="presence-wrap" id="presence"></div>
 </header>
 <div class="layout" id="layout">
+  <nav class="contents" aria-label="Plan contents"><div class="contents-title">Contents</div><div id="contentsLinks"></div></nav>
   <div class="board-wrap">
     <div class="toolbar" id="toolbar" hidden>
       <span class="spacer"></span>
-      <button type="button" class="toolbar-btn" id="collapseBtn" title="Expand or collapse the finished sections">Collapse done</button>
+      <button type="button" class="toolbar-btn" id="collapseBtn" title="Expand or collapse all section details and tasks">Expand all</button>
     </div>
     <main id="board" class="board"></main>
     <div class="ruler" id="ruler" title="Where the changes and notes are - click to jump"></div>

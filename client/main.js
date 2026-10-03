@@ -6,6 +6,7 @@ import mermaid from "mermaid";
 import { renderChangesPanel, changeGroups } from "./changes.js";
 import { STATUS_ORDER, ago, anchorKeyOf, clock, cssEscape, dayLabel, describeEvent as describeEv, esc, eventKey, fileSize } from "./util.js";
 import { createWhiteboardHost } from "./whiteboard.js";
+import { numberedSections } from "./outline.js";
 
 const bootEl = document.getElementById("planboard-state");
 let state = JSON.parse(bootEl.textContent);
@@ -51,7 +52,8 @@ let depth = "normal";
 let pendingFiles = [];
 const review = { index: -1 };
 const beforeMode = new Set();
-const expanded = new Set(loadJson("expanded", []));
+const expanded = new Set(loadJson("sectionDetails", []));
+const taskExpanded = new Set(loadJson("sectionTasks", []));
 
 function loadJson(key, fallback) {
   try {
@@ -156,6 +158,7 @@ function renderBoard() {
   }
   boardEl.innerHTML = `<article class="plan">${state.html}</article>`;
   boardEl.scrollTop = scroll;
+  buildOutline();
   renderDiagrams();
   paint();
 }
@@ -367,74 +370,110 @@ function decorateBoard() {
   }
 }
 
-// ---- collapse finished sections ------------------------------------------------
-
-function sectionLevel(h) {
-  return Number(h.dataset.level) || Number((h.tagName || "H2").slice(1)) || 2;
+// ---- section outline and progressive disclosure --------------------------------
+function buildOutline() {
+  const plan = boardEl.querySelector(".plan");
+  const nodes = [...plan.children];
+  let card = null;
+  let content = [];
+  function finish() {
+    if (!card) return;
+    const id = card.dataset.outline;
+    const summary = content[0]?.matches("p") ? content.shift() : null;
+    if (summary) { summary.classList.add("section-summary"); card.append(summary); }
+    const taskLists = content.filter(el => el.matches("ul, ol") && el.querySelector('li.item:not([data-status="none"])'));
+    const tasks = content.filter((el, index) => taskLists.includes(el) || (el.matches(".section-head") && taskLists.includes(content[index + 1])));
+    const details = content.filter(el => !tasks.includes(el));
+    for (const [kind, elements, label] of [["details", details, "Solution details"], ["tasks", tasks, "Tasks"]]) {
+      if (!elements.length) continue;
+      const group = document.createElement("details");
+      group.className = "section-disclosure";
+      group.dataset.kind = kind;
+      group.dataset.owner = id;
+      const heading = document.createElement("summary");
+      heading.textContent = label;
+      const body = document.createElement("div");
+      body.className = "disclosure-body";
+      body.append(...elements);
+      group.append(heading, body);
+      group.open = (kind === "tasks" ? taskExpanded : expanded).has(id);
+      group.addEventListener("toggle", () => {
+        const ids = kind === "tasks" ? taskExpanded : expanded;
+        if (group.open) ids.add(id); else ids.delete(id);
+        saveJson(kind === "tasks" ? "sectionTasks" : "sectionDetails", [...ids]);
+        updateOutlineControls();
+        renderRuler();
+      });
+      card.append(group);
+    }
+    const thoughts = document.createElement("button");
+    thoughts.type = "button";
+    thoughts.className = "section-thoughts";
+    thoughts.dataset.thoughts = id;
+    card.append(thoughts);
+  }
+  for (const el of nodes) {
+    if (el.matches(".section-head") && Number(el.dataset.level) === 2) {
+      finish();
+      card = document.createElement("section");
+      card.className = "plan-section";
+      card.dataset.outline = el.dataset.section;
+      el.before(card);
+      card.append(el);
+      content = [];
+    } else if (card) content.push(el);
+  }
+  finish();
 }
 
-// Everything under a heading up to the next heading of the same or a higher level.
-function sectionRange(h) {
-  const level = sectionLevel(h);
-  const els = [];
-  let el = h.nextElementSibling;
-  while (el && !(el.classList.contains("section-head") && sectionLevel(el) <= level)) {
-    els.push(el);
-    el = el.nextElementSibling;
-  }
-  return els;
+function updateOutlineControls() {
+  const groups = [...boardEl.querySelectorAll(".section-disclosure")];
+  toolbarEl.hidden = !groups.length;
+  collapseBtn.textContent = groups.length && groups.every(el => el.open) ? "Collapse all" : "Expand all";
+  collapseBtn.dataset.mode = groups.every(el => el.open) ? "collapse" : "expand";
 }
 
 function applyCollapse() {
-  for (const el of boardEl.querySelectorAll(".sec-hidden")) el.classList.remove("sec-hidden");
-  let anyComplete = false;
-  let anyCollapsed = false;
-  for (const h of boardEl.querySelectorAll(".section-head")) {
-    const complete = h.classList.contains("sec-complete");
-    h.classList.remove("collapsed");
-    if (!complete) continue;
-    anyComplete = true;
-    const collapsed = !expanded.has(h.dataset.section);
-    const toggle = document.createElement("button");
-    toggle.type = "button";
-    toggle.className = "deco sec-toggle";
-    toggle.dataset.toggleSection = h.dataset.section;
-    toggle.title = collapsed ? "Show this finished section" : "Collapse this finished section";
-    toggle.setAttribute("aria-expanded", String(!collapsed));
-    h.insertBefore(toggle, h.firstChild);
-    if (!collapsed) continue;
-    anyCollapsed = true;
-    h.classList.add("collapsed");
-    const range = sectionRange(h);
-    let n = 0;
-    for (const el of range) {
-      el.classList.add("sec-hidden");
-      n += el.matches("ul, ol") ? el.querySelectorAll('li.item:not([data-status="none"])').length : 0;
-    }
-    const more = document.createElement("span");
-    more.className = "deco sec-more";
-    more.textContent = `${n} done item${n === 1 ? "" : "s"} folded`;
-    h.appendChild(more);
+  $("#contentsLinks").innerHTML = numberedSections(state.sections || []).map(section => {
+    const id = section.id;
+    const thread = state.threads?.[`section:${id}`];
+    const counts = section?.counts;
+    const active = selection.type === "section" && selection.section === id;
+    return `<button type="button" class="contents-link${active ? " active" : ""}" data-jump-section="${esc(id)}" style="--indent:${section.depth}" ${active ? 'aria-current="location"' : ''}><span>${section.number ? `<span class="contents-number">${section.number}</span> ` : ""}${esc(section.displayTitle)}</span><small>${counts?.total ? `${counts.done}/${counts.total}` : ""}${thread ? ` · ${thread.count} thought${thread.count === 1 ? "" : "s"}${thread.last_from === "agent" ? " · reply" : ""}` : ""}</small></button>`;
+  }).join("");
+  for (const button of boardEl.querySelectorAll("[data-thoughts]")) {
+    const thread = state.threads?.[`section:${button.dataset.thoughts}`];
+    button.textContent = thread ? `${thread.count} thought${thread.count === 1 ? "" : "s"}${thread.last_from === "agent" ? " · Agent replied" : ""}` : "Discuss this section";
   }
-  toolbarEl.hidden = !anyComplete;
-  collapseBtn.hidden = !anyComplete;
-  collapseBtn.textContent = anyCollapsed ? "Expand done" : "Collapse done";
-  collapseBtn.dataset.mode = anyCollapsed ? "expand" : "collapse";
+  for (const group of boardEl.querySelectorAll('.section-disclosure[data-kind="tasks"]')) {
+    const items = [...group.querySelectorAll('li.item:not([data-status="none"])')];
+    group.querySelector("summary").textContent = `Tasks · ${items.filter(el => el.dataset.status === "done").length}/${items.length} done`;
+  }
+  updateOutlineControls();
 }
 
-function toggleSection(id) {
-  if (expanded.has(id)) expanded.delete(id);
-  else expanded.add(id);
-  saveJson("expanded", [...expanded]);
-  paint();
-}
+boardEl.addEventListener("click", ev => {
+  const summary = ev.target.closest(".section-disclosure > summary");
+  if (!summary) return;
+  const group = summary.parentElement;
+  if (!group.open && group.dataset.kind === "details") {
+    for (const other of boardEl.querySelectorAll('.section-disclosure[data-kind="details"]')) {
+      if (other !== group) other.open = false;
+    }
+  }
+});
+
+$("#contentsLinks").addEventListener("click", ev => {
+  const button = ev.target.closest("[data-jump-section]");
+  if (!button) return;
+  select({ type: "section", section: button.dataset.jumpSection }, { focus: false, scrollTo: true });
+});
 
 collapseBtn.addEventListener("click", () => {
-  if (collapseBtn.dataset.mode === "expand") {
-    for (const h of boardEl.querySelectorAll(".section-head.sec-complete")) expanded.add(h.dataset.section);
-  } else expanded.clear();
-  saveJson("expanded", [...expanded]);
-  paint();
+  const open = collapseBtn.dataset.mode === "expand";
+  for (const group of boardEl.querySelectorAll(".section-disclosure")) group.open = open;
+  updateOutlineControls();
+  renderRuler();
 });
 
 // ---- ruler: where the changes and notes are along the whole plan -----------------------
@@ -536,13 +575,9 @@ function select(anchor, { focus = true, scrollTo = false } = {}) {
 function revealAnchor(a) {
   const el = elementForAnchor(a);
   if (!el) return;
-  let top = el;
-  while (top && top.parentElement && !top.parentElement.classList.contains("plan")) top = top.parentElement;
-  if (!top || !top.classList.contains("sec-hidden")) return;
-  let h = top.previousElementSibling;
-  while (h && !h.classList.contains("section-head")) h = h.previousElementSibling;
-  if (h && h.classList.contains("sec-complete")) expanded.add(h.dataset.section);
-  saveJson("expanded", [...expanded]);
+  for (let parent = el.parentElement; parent && parent !== boardEl; parent = parent.parentElement) {
+    if (parent.matches("details.section-disclosure")) parent.open = true;
+  }
 }
 
 function elementForAnchor(a) {
@@ -590,11 +625,11 @@ function anchorFromKey(key) {
 boardEl.addEventListener("click", (ev) => {
   const t = ev.target;
   if (!(t instanceof Element)) return;
-  const toggleSec = t.closest("[data-toggle-section]");
-  if (toggleSec) {
-    ev.preventDefault();
-    ev.stopPropagation();
-    toggleSection(toggleSec.dataset.toggleSection);
+  if (t.closest(".section-disclosure > summary")) return;
+  const thoughts = t.closest("[data-thoughts]");
+  if (thoughts) {
+    select({ type: "section", section: thoughts.dataset.thoughts });
+    setTab("thread");
     return;
   }
   const beforeBtn = t.closest(".toggle-before");

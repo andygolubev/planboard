@@ -100,8 +100,15 @@ read the reply next to the item      planboard poll PLAN.md …
 ```
 
 - **Board** (left): the plan. Green check = done, half amber = in progress, red `!` = blocked,
-  purple `?` = needs your decision. Section headers carry a stacked progress bar; a section that
-  is 100 % done folds to its heading (chevron to unfold, **Collapse done / Expand done** for all).
+  purple `?` = needs your decision. Section headers carry a stacked progress bar. The **Contents** sidebar jumps to sections
+  and shows progress and section discussion counts. Contents numbers follow the
+  Markdown heading order automatically: `1`, `1.1`, `1.1.1`. The document title
+  is unnumbered. Use `##` for main sections and `###` for subsections; keep sections
+  in their intended order and do not type numbers into heading titles. Each second-level section has
+  independently expandable **Solution details** and **Tasks**; opening another section’s
+  details closes the previous one. **Expand all / Collapse all** controls the full outline.
+  **Discuss this section** opens its attached conversation. Expansion choices are saved
+  per board, and selecting a hidden item reveals its containing group.
   Items with notes carry a count badge (dashed = not sent yet, filled = waiting for the agent,
   green = agent answered last, 📎 = attachments). Items that changed since your last visit get a
   coloured left rail and a tag drawing the move (old-status dot → new-status dot). The thin

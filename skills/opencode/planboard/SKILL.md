@@ -14,6 +14,13 @@ in place. In every command below, replace PLAN.md with the actual chosen plan pa
 Edit its concrete tasks and keep existing item and heading {#id} anchors stable
 so their threads stay attached.
 
+Keep sections in their intended reading and execution order. Use one # title,
+## for main sections, ### for subsections, and deeper levels only within their
+parent; do not skip heading levels. Insert new sections under the correct parent
+at the appropriate position. Do not reorder existing sections unless the user
+asks or the change requires it. Contents numbering is automatic (1, 1.1, 1.1.1);
+do not type numeric prefixes into headings or change stable {#id} anchors.
+
 Open with `planboard PLAN.md`. If browser launch is unavailable, use
 `planboard PLAN.md --no-open` and give the user the printed URL. The daemon and
 browser must be able to reach each other; follow the environment's permissions

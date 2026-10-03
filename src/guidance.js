@@ -14,6 +14,11 @@ export const CONVENTIONS = `PLAN.md conventions
     state, class, ER...). Node ids in the diagram are what the user clicks on.
   - ![caption](relative/path.png) images render and can be pinned at a point.
   - Front matter (--- title: ... ---) is optional; the first # heading is the title.
+  - Preserve section order and hierarchy: one # title, ## main sections, ###
+    subsections. Do not skip levels. Insert new sections under the correct parent
+    in the intended reading/execution order. Reorder only when requested or needed
+    by the change. Contents numbering is automatic; do not number heading text
+    manually or rename stable {#id} anchors.
   - Everything else is ordinary Markdown; raw HTML/SVG passes through.`;
 
 export const DEPTH_GUIDE = `Note depth (the user picks it per note: quick · normal · deep)
@@ -248,6 +253,12 @@ This project reviews its Markdown plan on a live board with the user.
 For a new plan, use \`planboard init\` to create .planboard/PLAN.md at the repository
 root. Honor explicitly chosen paths and keep existing plans in their current location.
 In the commands below, replace PLAN.md with the actual chosen path.
+Keep sections in their intended reading and execution order. Use one # title,
+## for main sections, ### for subsections, and deeper levels only within their
+parent; do not skip heading levels. Insert new sections under the correct parent
+at the appropriate position. Do not reorder existing sections unless the user
+asks or the change requires it. Contents numbering is automatic (1, 1.1, 1.1.1);
+do not type numeric prefixes into headings or change stable {#id} anchors.
 Run \`planboard --help\` for the conventions and the loop; \`planboard show PLAN.md\` shows the
 plan with ids and note counts; \`planboard poll PLAN.md --owner "<model>, effort <level>"\`
 waits for the user's notes; answer with \`planboard reply\`, flip statuses with \`planboard set\`;
@@ -274,6 +285,13 @@ Honor an explicitly chosen path with \`planboard init <path>\`; keep existing pl
 in place. In every command below, replace PLAN.md with the actual chosen plan path.
 Edit its concrete tasks and keep existing item and heading {#id} anchors stable
 so their threads stay attached.
+
+Keep sections in their intended reading and execution order. Use one # title,
+## for main sections, ### for subsections, and deeper levels only within their
+parent; do not skip heading levels. Insert new sections under the correct parent
+at the appropriate position. Do not reorder existing sections unless the user
+asks or the change requires it. Contents numbering is automatic (1, 1.1, 1.1.1);
+do not type numeric prefixes into headings or change stable {#id} anchors.
 
 Open with \`planboard PLAN.md\`. If browser launch is unavailable, use
 \`planboard PLAN.md --no-open\` and give the user the printed URL. The daemon and
