@@ -28,7 +28,6 @@ const composerText = $("#composerText");
 const composerHint = $("#composerHint");
 const sendBtn = $("#sendBtn");
 const addBtn = $("#addBtn");
-const depthEl = $("#depth");
 const attachBtn = $("#attachBtn");
 const attachInput = $("#attachInput");
 const attachStrip = $("#attachStrip");
@@ -49,7 +48,6 @@ let sinceBasis = state.since_basis || "open";
 let connected = false;
 let mermaidCounter = 0;
 let tempPin = null;
-let depth = "normal";
 let pendingFiles = [];
 const review = { index: -1 };
 const beforeMode = new Set();
@@ -179,7 +177,7 @@ function beforeSourceOf(diagramId) {
 }
 
 async function renderDiagrams() {
-  const dark = window.matchMedia("(prefers-color-scheme: dark)").matches;
+  const dark = document.documentElement.dataset.theme === "dark";
   mermaid.initialize({ startOnLoad: false, theme: dark ? "dark" : "neutral", securityLevel: "strict", fontFamily: "inherit" });
   for (const fig of boardEl.querySelectorAll("figure.diagram")) await renderDiagram(fig);
   paint();
@@ -1076,19 +1074,6 @@ panelScroll.addEventListener("click", async (ev) => {
 
 // ---------------------------------------------------------------- composer
 
-depthEl.addEventListener("click", (ev) => {
-  const b = ev.target.closest("[data-depth]");
-  if (!b) return;
-  depth = b.dataset.depth;
-  for (const x of depthEl.querySelectorAll("[data-depth]")) x.classList.toggle("active", x === b);
-  composerText.focus();
-});
-
-function setDepth(d) {
-  depth = d;
-  for (const x of depthEl.querySelectorAll("[data-depth]")) x.classList.toggle("active", x.dataset.depth === d);
-}
-
 function renderAttachStrip() {
   attachStrip.hidden = !pendingFiles.length;
   attachStrip.innerHTML = pendingFiles
@@ -1164,12 +1149,11 @@ async function addNote({ send = false } = {}) {
   addBtn.disabled = true;
   try {
     const quote = selection.type === "text" ? selection.quote : undefined;
-    await api("POST", "/notes", { anchor: selection, text, quote, depth, attachments: pendingFiles.map((f) => f.file) });
+    await api("POST", "/notes", { anchor: selection, text, quote, attachments: pendingFiles.map((f) => f.file) });
     composerText.value = "";
     tempPin = null;
     pendingFiles = [];
     renderAttachStrip();
-    setDepth("normal");
     await refreshState();
     renderPanel();
     paint();
@@ -1410,6 +1394,30 @@ setInterval(() => {
 }, 60000);
 
 // ---------------------------------------------------------------- boot
+
+const themeToggle = $("#themeToggle");
+function updateThemeToggle() {
+  const dark = document.documentElement.dataset.theme === "dark";
+  themeToggle.textContent = dark ? "☀ Light" : "☾ Dark";
+  themeToggle.setAttribute("aria-label", `Switch to ${dark ? "light" : "dark"} theme`);
+  themeToggle.title = `Switch to ${dark ? "light" : "dark"} theme`;
+}
+themeToggle.addEventListener("click", () => {
+  const theme = document.documentElement.dataset.theme === "dark" ? "light" : "dark";
+  document.documentElement.dataset.theme = theme;
+  try { localStorage.setItem("pb:theme", theme); } catch {}
+  updateThemeToggle();
+  renderDiagrams();
+});
+window.matchMedia("(prefers-color-scheme: dark)").addEventListener("change", event => {
+  let saved;
+  try { saved = localStorage.getItem("pb:theme"); } catch {}
+  if (saved === "light" || saved === "dark") return;
+  document.documentElement.dataset.theme = event.matches ? "dark" : "light";
+  updateThemeToggle();
+  renderDiagrams();
+});
+updateThemeToggle();
 
 renderBoard();
 renderTopbar();

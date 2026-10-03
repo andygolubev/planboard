@@ -594,6 +594,7 @@ function renderBoardPage(board) {
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 viewBox=%270 0 32 32%27%3E%3Crect width=%2732%27 height=%2732%27 rx=%277%27 fill=%27%232456d6%27/%3E%3Cpath d=%27M9 16.5l4.5 4.5L23 12%27 fill=%27none%27 stroke=%27%23fff%27 stroke-width=%273.2%27 stroke-linecap=%27round%27 stroke-linejoin=%27round%27/%3E%3C/svg%3E">
 <link rel="stylesheet" href="/client/board.css">
 <script id="planboard-state" type="application/json">${json}</script>
+<script>try { const t = localStorage.getItem("pb:theme"); document.documentElement.dataset.theme = t === "light" || t === "dark" ? t : matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light"; } catch { document.documentElement.dataset.theme = matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light"; }</script>
 </head>
 <body>
 <header class="topbar" id="topbar">
@@ -602,6 +603,7 @@ function renderBoardPage(board) {
   <div class="progress" id="progress"></div>
   <button type="button" class="changes-chip" id="changesChip" hidden></button>
   <div class="spacer"></div>
+  <button type="button" class="top-link theme-toggle" id="themeToggle">Dark</button>
   <a class="top-link" id="exportLink" href="/boards/${escapeHtml(state.key)}/api/export?download" title="Download the plan with all threads as one Markdown file">Export</a>
   <button type="button" class="top-link" id="helpBtn" title="Keyboard shortcuts (?)">?</button>
   <div class="presence-wrap" id="presence"></div>
@@ -633,11 +635,6 @@ function renderBoardPage(board) {
       <div class="attach-strip" id="attachStrip" hidden></div>
       <textarea id="composerText" rows="3" placeholder="Note on the plan… (Enter adds, ⌘/Ctrl+Enter adds and sends)"></textarea>
       <div class="composer-row">
-        <div class="depth" id="depth" title="How hard the agent should work on this note">
-          <button type="button" data-depth="quick" title="Quick: a short answer from what the agent knows, trivial edits only">quick</button>
-          <button type="button" data-depth="normal" class="active" title="Normal: read, change, verify, reply briefly">normal</button>
-          <button type="button" data-depth="deep" title="Deep: research, weigh alternatives, implement and verify, explain the reasoning">deep</button>
-        </div>
         <button type="button" class="icon-btn" id="attachBtn" title="Attach a screenshot (or paste / drop one)">📎</button>
         <input type="file" id="attachInput" accept="image/png,image/jpeg,image/gif,image/webp" multiple hidden>
         <span class="composer-hint" id="composerHint"></span>

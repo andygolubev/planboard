@@ -119,9 +119,7 @@ read the reply next to the item      planboard poll PLAN.md …
   day separators; **Changes** is the review view (below).
 - **Composer**: Enter adds a note (it stays "not sent" until you press **Send**, so you can walk
   the whole plan first); ⌘/Ctrl+Enter adds and sends; Esc goes back to the whole plan. You can
-  also flip an item's status yourself from the panel. Each note carries a **depth** - *quick*
-  (one-line answer, trivial edits), *normal*, *deep* (research, alternatives, verified change,
-  reasoning in the reply) - that tells the agent how hard to work on it. Paste or drop a
+  also flip an item's status yourself from the panel. Paste or drop a
   screenshot (or use 📎) to attach it: it is stored beside the plan and shown in the thread.
 - **Top bar**: the stacked status bar, the changes chip, **Export**, and agent presence - *no agent
   listening*, *agent is listening* (a poll is attached), *agent is working on your notes*
