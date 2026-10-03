@@ -608,12 +608,7 @@ function renderBoardPage(board) {
 </header>
 <div class="layout" id="layout">
   <div class="board-wrap">
-    <div class="toolbar" id="toolbar">
-      <span class="toolbar-label">Show</span>
-      <button type="button" class="filter" data-filter="open" title="Hide done and dropped items (o)">Open</button>
-      <button type="button" class="filter" data-filter="changed" title="Only what changed since your last visit (c)">Changed</button>
-      <button type="button" class="filter" data-filter="notes" title="Only items with notes (t)">With notes</button>
-      <span class="toolbar-count" id="filterCount"></span>
+    <div class="toolbar" id="toolbar" hidden>
       <span class="spacer"></span>
       <button type="button" class="toolbar-btn" id="collapseBtn" title="Expand or collapse the finished sections">Collapse done</button>
     </div>
@@ -633,7 +628,7 @@ function renderBoardPage(board) {
     <div class="panel-scroll" id="panelScroll"></div>
     <form class="composer" id="composer">
       <div class="attach-strip" id="attachStrip" hidden></div>
-      <textarea id="composerText" rows="3" placeholder="Note on the whole plan… (Enter adds, ⌘/Ctrl+Enter adds and sends)"></textarea>
+      <textarea id="composerText" rows="3" placeholder="Note on the plan… (Enter adds, ⌘/Ctrl+Enter adds and sends)"></textarea>
       <div class="composer-row">
         <div class="depth" id="depth" title="How hard the agent should work on this note">
           <button type="button" data-depth="quick" title="Quick: a short answer from what the agent knows, trivial edits only">quick</button>
@@ -643,8 +638,8 @@ function renderBoardPage(board) {
         <button type="button" class="icon-btn" id="attachBtn" title="Attach a screenshot (or paste / drop one)">📎</button>
         <input type="file" id="attachInput" accept="image/png,image/jpeg,image/gif,image/webp" multiple hidden>
         <span class="composer-hint" id="composerHint"></span>
-        <button type="button" class="btn ghost" id="sendBtn" disabled>Send</button>
-        <button type="submit" class="btn primary" id="addBtn">Add note</button>
+        <button type="button" class="btn ghost" id="sendBtn" title="Send all queued notes. While typing, Command+Enter on Mac or Ctrl+Enter on Linux and Windows also adds the current draft and sends it." disabled>Send</button>
+        <button type="submit" class="btn primary" id="addBtn" title="Add this note to the queue (Enter while typing)">Add note</button>
       </div>
     </form>
   </aside>
@@ -664,7 +659,6 @@ function renderBoardPage(board) {
       <dt>Enter</dt><dd>open the item's thread and write</dd>
       <dt>Esc</dt><dd>back to the whole plan (closes overlays first)</dd>
       <dt>n / p</dt><dd>next / previous change since your last visit</dd>
-      <dt>o · c · t</dt><dd>toggle the Open · Changed · With notes filters</dd>
       <dt>1 · 2 · 3</dt><dd>Thread · Activity · Changes tab</dd>
       <dt>?</dt><dd>this help</dd>
     </dl>

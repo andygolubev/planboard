@@ -28,6 +28,10 @@ export const DEPTH_GUIDE = `Note depth (the user picks it per note: quick · nor
           settings of the session that runs \`planboard poll\` (configured in the agent harness).`;
 
 export const WORKFLOW = `Review loop
+  Plan location: honor an explicit path or continue using an existing plan. For a new
+  plan without a specified path, run \`planboard init\`: it creates .planboard/PLAN.md
+  at the repository root (current directory outside Git). In commands below,
+  PLAN.md means the chosen plan path; always pass that actual path.
   1. Write or update PLAN.md, then run \`planboard <PLAN.md>\` once to open the
      board (it prints the URL; re-running is harmless). The board re-renders
      live on every save, so keep editing the file - never regenerate HTML.
@@ -87,7 +91,8 @@ Commands
                                        the plan with every thread folded in under its item plus the status
                                        history, as one Markdown file (stdout unless --out) - for project records
   planboard lint <PLAN.md>             report items without ids, duplicate ids
-  planboard init [PLAN.md]             scaffold a plan file with the conventions
+  planboard init [path]                scaffold a plan; default: <repo>/.planboard/PLAN.md
+                                       outside Git: <cwd>/.planboard/PLAN.md; explicit paths are honored
   planboard boards                     list boards the server knows
   planboard setup claude [--global] [--hook]
                                        install the Claude Code skill (project or ~/.claude); --hook adds a SessionStart hook
@@ -198,7 +203,7 @@ flowchart LR
 <!--
 Conventions: [ ] todo · [~] in progress · [x] done · [!] blocked · [?] decision · [-] dropped.
 Every item and heading ends with {#id}; ids never change once discussed.
-Run: planboard PLAN.md  (open)   planboard poll PLAN.md  (wait for notes)
+Run: planboard <path-to-this-file>  (open)   planboard poll <path-to-this-file>  (wait for notes)
 -->
 `;
 
@@ -222,6 +227,11 @@ Current guidance lives in the CLI, not in this file:
 - \`planboard thread <PLAN.md> <id>\` to read what was already discussed about an item
 - \`planboard export <PLAN.md>\` to write the plan with all threads as one Markdown file
 
+For new plans without an explicit path, run \`planboard init\` to create
+.planboard/PLAN.md at the repository root (current directory outside Git). Honor
+explicit paths and keep existing plans in place. Replace PLAN.md below with the
+actual chosen plan path.
+
 Use the planboard skill for the full review loop. Poll with
 \`planboard poll PLAN.md --timeout 30 --owner "Cursor"\` in the foreground, shortening
 the timeout if needed to fit the terminal tool's limit. Collect any tracked command's
@@ -234,7 +244,10 @@ ends the review. A detached process does not keep an ended turn listening.
 export const AGENTS_MD_SECTION = `
 ## planboard
 
-This project keeps its plan in PLAN.md and reviews it on a live board with the user.
+This project reviews its Markdown plan on a live board with the user.
+For a new plan, use \`planboard init\` to create .planboard/PLAN.md at the repository
+root. Honor explicitly chosen paths and keep existing plans in their current location.
+In the commands below, replace PLAN.md with the actual chosen path.
 Run \`planboard --help\` for the conventions and the loop; \`planboard show PLAN.md\` shows the
 plan with ids and note counts; \`planboard poll PLAN.md --owner "<model>, effort <level>"\`
 waits for the user's notes; answer with \`planboard reply\`, flip statuses with \`planboard set\`;
@@ -255,8 +268,12 @@ description: Review a Markdown plan with the user on a live Planboard board. Use
 
 Run \`planboard --help\` for the current command contract and plan conventions.
 Use the plan named by the user; \`planboard boards\` lists known boards. Create a
-missing plan with \`planboard init PLAN.md\`, then edit its concrete tasks. Keep
-existing item and heading {#id} anchors stable so their threads stay attached.
+new plan without a specified location with \`planboard init\`: the default is
+.planboard/PLAN.md at the repository root, or under the current directory outside Git.
+Honor an explicitly chosen path with \`planboard init <path>\`; keep existing plans
+in place. In every command below, replace PLAN.md with the actual chosen plan path.
+Edit its concrete tasks and keep existing item and heading {#id} anchors stable
+so their threads stay attached.
 
 Open with \`planboard PLAN.md\`. If browser launch is unavailable, use
 \`planboard PLAN.md --no-open\` and give the user the printed URL. The daemon and

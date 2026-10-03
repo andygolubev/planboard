@@ -7,8 +7,12 @@ description: Review a Markdown plan with the user on a live Planboard board. Use
 
 Run `planboard --help` for the current command contract and plan conventions.
 Use the plan named by the user; `planboard boards` lists known boards. Create a
-missing plan with `planboard init PLAN.md`, then edit its concrete tasks. Keep
-existing item and heading {#id} anchors stable so their threads stay attached.
+new plan without a specified location with `planboard init`: the default is
+.planboard/PLAN.md at the repository root, or under the current directory outside Git.
+Honor an explicitly chosen path with `planboard init <path>`; keep existing plans
+in place. In every command below, replace PLAN.md with the actual chosen plan path.
+Edit its concrete tasks and keep existing item and heading {#id} anchors stable
+so their threads stay attached.
 
 Open with `planboard PLAN.md`. If browser launch is unavailable, use
 `planboard PLAN.md --no-open` and give the user the printed URL. The daemon and

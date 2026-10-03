@@ -986,7 +986,7 @@ body.home .home-main {
 }
 
 /* ======================================================================
-   Milestone 2 + 3: toolbar & filters, folded sections, ruler, change
+   Milestone 2 + 3: toolbar, folded sections, ruler, change
    graphics, depth & attachments, phone sheet, whiteboard overlay
    ====================================================================== */
 [hidden] {
@@ -1093,33 +1093,8 @@ body.home .home-main {
   overflow: hidden;
   white-space: nowrap;
 }
-.toolbar-label {
-  text-transform: uppercase;
-  letter-spacing: 0.08em;
-  font-size: 11px;
-  font-weight: 600;
-}
-.filter {
-  border: 1px solid var(--line);
-  background: var(--paper);
-  border-radius: 999px;
-  padding: 2px 11px;
-  cursor: pointer;
-  font-size: 12.5px;
-  color: var(--ink);
-}
-.filter:hover:not(.active) {
-  border-color: var(--accent);
-  color: var(--accent);
-}
-.filter.active {
-  background: var(--accent);
-  border-color: var(--accent);
-  color: #fff;
-}
-.toolbar-count {
-  margin-left: 4px;
-  font-variant-numeric: tabular-nums;
+.toolbar[hidden] {
+  display: none;
 }
 .toolbar-btn {
   border: 0;
@@ -1133,22 +1108,6 @@ body.home .home-main {
 .toolbar-btn:hover {
   background: var(--accent-soft);
 }
-.filtered-out {
-  display: none !important;
-}
-.board.filtering .section-head.sec-empty {
-  opacity: 0.45;
-  font-size: 15px;
-  margin-top: 1em;
-  padding-bottom: 2px;
-  border-bottom: 0;
-}
-.board.filtering .section-head.sec-empty .sec-progress,
-.board.filtering .section-head.sec-empty .sec-more,
-.board.filtering .section-head.sec-empty .sec-toggle {
-  display: none;
-}
-
 /* ---------- folded (100 % done) sections ---------- */
 .sec-toggle {
   width: 18px;

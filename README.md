@@ -42,6 +42,17 @@ time; without it the board simply has no whiteboard button.
 
 ## The plan file
 
+Run `planboard init` to create `.planboard/PLAN.md` at the repository root, even
+from a subdirectory. Outside Git, it uses `.planboard/PLAN.md` in the current
+directory. The folder is created automatically. To choose another location, run
+`planboard init docs/launch.md`; explicit relative paths resolve from the current
+directory, and absolute paths are also supported. Existing plans stay where they are.
+
+Open the default plan with `planboard .planboard/PLAN.md` from the repository root.
+In the examples below, replace `PLAN.md` with your actual plan path.
+Notes and history live beside the plan by default, so the default plan uses
+`.planboard/PLAN.board/`. `PLANBOARD_STATE_DIR` still overrides the history location.
+
 Ordinary Markdown plus three conventions:
 
 ````markdown
@@ -96,9 +107,6 @@ read the reply next to the item      planboard poll PLAN.md …
   coloured left rail and a tag drawing the move (old-status dot → new-status dot). The thin
   **ruler** on the right edge is a minimap of where the changes and notes are along the whole
   plan - click a tick to jump.
-- **Filters** (toolbar): **Open** hides done and dropped items, **Changed** shows only what moved
-  since your last visit, **With notes** only items that have a thread; they combine, and the
-  count says how many items match.
 - **Panel** (right): the thread on whatever you selected - an item, a heading, a diagram node, an
   image point, a text selection, or the whole plan. **Activity** is everything in time order with
   day separators; **Changes** is the review view (below).
@@ -114,8 +122,7 @@ read the reply next to the item      planboard poll PLAN.md …
   see which model and effort level will read your notes: that is decided by the agent session that
   runs the poll, not by planboard, which never calls a model itself.
 - **Keyboard**: `j`/`k` move between items, `Enter` opens the thread and the note box, `Esc` goes
-  back to the whole plan, `n`/`p` walk through the changes, `o`/`c`/`t` toggle the filters,
-  `1`/`2`/`3` switch tabs, `?` shows the cheat sheet.
+  back to the whole plan, `n`/`p` walk through the changes, `1`/`2`/`3` switch tabs, `?` shows the cheat sheet.
 - **Phone**: under 900 px the panel is a bottom sheet - tap an item to open it, swipe it down with
   the handle or Esc.
 

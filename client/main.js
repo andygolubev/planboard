@@ -1,5 +1,5 @@
 // The board in the browser. One document, no iframe: the plan HTML comes from the
-// server, this script adds selection, notes, diagrams, filters, keyboard, live
+// server, this script adds selection, notes, diagrams, keyboard, live
 // updates, the change-review graphics and the whiteboard overlay.
 import mermaid from "mermaid";
 
@@ -17,7 +17,6 @@ const $ = (sel, root = document) => root.querySelector(sel);
 const boardEl = $("#board");
 const rulerEl = $("#ruler");
 const toolbarEl = $("#toolbar");
-const filterCountEl = $("#filterCount");
 const collapseBtn = $("#collapseBtn");
 const panelEl = $("#panel");
 const panelScroll = $("#panelScroll");
@@ -52,7 +51,6 @@ let depth = "normal";
 let pendingFiles = [];
 const review = { index: -1 };
 const beforeMode = new Set();
-let filters = loadJson("filters", { open: false, changed: false, notes: false });
 const expanded = new Set(loadJson("expanded", []));
 
 function loadJson(key, fallback) {
@@ -147,7 +145,6 @@ async function refreshState() {
 }
 
 const isPhone = () => window.matchMedia("(max-width: 900px)").matches;
-const anyFilter = () => filters.open || filters.changed || filters.notes;
 
 // ---------------------------------------------------------------- board
 
@@ -163,11 +160,10 @@ function renderBoard() {
   paint();
 }
 
-// Decorations, collapse, filters and the ruler always go together.
+// Decorations, collapse and the ruler always go together.
 function paint() {
   decorateBoard();
   applyCollapse();
-  applyFilters();
   renderRuler();
   renderSheetHandle();
 }
@@ -390,7 +386,6 @@ function sectionRange(h) {
 }
 
 function applyCollapse() {
-  const filtering = anyFilter();
   for (const el of boardEl.querySelectorAll(".sec-hidden")) el.classList.remove("sec-hidden");
   let anyComplete = false;
   let anyCollapsed = false;
@@ -399,7 +394,7 @@ function applyCollapse() {
     h.classList.remove("collapsed");
     if (!complete) continue;
     anyComplete = true;
-    const collapsed = !filtering && !expanded.has(h.dataset.section);
+    const collapsed = !expanded.has(h.dataset.section);
     const toggle = document.createElement("button");
     toggle.type = "button";
     toggle.className = "deco sec-toggle";
@@ -421,6 +416,7 @@ function applyCollapse() {
     more.textContent = `${n} done item${n === 1 ? "" : "s"} folded`;
     h.appendChild(more);
   }
+  toolbarEl.hidden = !anyComplete;
   collapseBtn.hidden = !anyComplete;
   collapseBtn.textContent = anyCollapsed ? "Expand done" : "Collapse done";
   collapseBtn.dataset.mode = anyCollapsed ? "expand" : "collapse";
@@ -439,55 +435,6 @@ collapseBtn.addEventListener("click", () => {
   } else expanded.clear();
   saveJson("expanded", [...expanded]);
   paint();
-});
-
-// ---- filters ------------------------------------------------------------------
-
-function applyFilters() {
-  const any = anyFilter();
-  boardEl.classList.toggle("filtering", any);
-  for (const b of toolbarEl.querySelectorAll(".filter")) b.classList.toggle("active", Boolean(filters[b.dataset.filter]));
-  for (const el of boardEl.querySelectorAll(".filtered-out, .sec-empty")) el.classList.remove("filtered-out", "sec-empty");
-  const items = [...boardEl.querySelectorAll('li.item:not([data-status="none"])')];
-  let visible = 0;
-  if (any) {
-    // children first, so a parent stays when one of its sub-items matches
-    for (const li of [...items].reverse()) {
-      const st = li.dataset.status;
-      let match = true;
-      if (filters.open && (st === "done" || st === "dropped")) match = false;
-      if (filters.changed && !li.classList.contains("changed")) match = false;
-      if (filters.notes && !li.classList.contains("has-notes")) match = false;
-      const childVisible = li.querySelector("li.item:not(.filtered-out)") !== null && [...li.querySelectorAll("li.item")].some((c) => !c.classList.contains("filtered-out"));
-      if (!match && !childVisible) li.classList.add("filtered-out");
-    }
-    for (const fig of boardEl.querySelectorAll("figure.diagram")) {
-      const keep = (filters.changed && fig.classList.contains("changed")) || (filters.notes && fig.classList.contains("has-notes"));
-      if (!keep) fig.classList.add("filtered-out");
-    }
-    for (const el of boardEl.querySelectorAll(".plan > p.block, .plan > blockquote.block, .plan > table.block, .plan > pre")) {
-      const keep = filters.notes && el.querySelector(".img-wrap.has-notes");
-      if (!keep) el.classList.add("filtered-out");
-    }
-    for (const h of boardEl.querySelectorAll(".section-head")) {
-      const range = sectionRange(h);
-      const has = range.some((el) => (el.matches("ul, ol") && el.querySelector("li.item:not(.filtered-out)")) || (el.matches("figure.diagram, p.block") && !el.classList.contains("filtered-out")) || (el.classList.contains("section-head") && !el.classList.contains("sec-empty")));
-      if (!has) h.classList.add("sec-empty");
-    }
-  }
-  for (const li of items) if (!li.classList.contains("filtered-out") && li.getClientRects().length) visible++;
-  filterCountEl.textContent = any ? `${visible} of ${items.length} items` : "";
-  filterCountEl.hidden = !any;
-}
-
-function toggleFilter(name) {
-  filters = { ...filters, [name]: !filters[name] };
-  saveJson("filters", filters);
-  paint();
-}
-toolbarEl.addEventListener("click", (ev) => {
-  const b = ev.target.closest(".filter");
-  if (b) toggleFilter(b.dataset.filter);
 });
 
 // ---- ruler: where the changes and notes are along the whole plan -----------------------
@@ -786,7 +733,7 @@ function toggleBefore(did) {
 // ---------------------------------------------------------------- keyboard
 
 function visibleItems() {
-  return [...boardEl.querySelectorAll('li.item:not([data-status="none"])')].filter((el) => !el.classList.contains("filtered-out") && el.getClientRects().length);
+  return [...boardEl.querySelectorAll('li.item:not([data-status="none"])')].filter((el) => el.getClientRects().length);
 }
 
 function moveItem(delta) {
@@ -840,15 +787,6 @@ document.addEventListener("keydown", (ev) => {
     case "p":
       ev.preventDefault();
       reviewStep(-1);
-      break;
-    case "o":
-      toggleFilter("open");
-      break;
-    case "c":
-      toggleFilter("changed");
-      break;
-    case "t":
-      toggleFilter("notes");
       break;
     case "1":
       setTab("thread");
@@ -943,7 +881,7 @@ function renderContext() {
     }
   });
   panelContext.querySelector(".wb-btn")?.addEventListener("click", (ev) => openWhiteboard(ev.currentTarget.dataset.diagram));
-  composerText.placeholder = isBoard ? "Note on the whole plan… (Enter adds, ⌘/Ctrl+Enter adds and sends)" : `Note on: ${selectionLabel}`;
+  composerText.placeholder = isBoard ? "Note on the plan… (Enter adds, ⌘/Ctrl+Enter adds and sends)" : `Note on: ${selectionLabel}`;
 }
 
 function kindLabel(a) {
