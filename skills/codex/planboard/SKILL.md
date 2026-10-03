@@ -5,6 +5,11 @@ description: Review a Markdown plan with the user on a live Planboard board. Use
 
 # planboard for Codex
 
+Make file changes only by default. Do not create commits or new Git branches,
+and do not push changes, unless the user explicitly asks for that Git action.
+A plan item, review note, or completed implementation is not permission to commit
+or create a branch. Leave Git actions to the user unless explicitly requested.
+
 Run `planboard --help` for the current command contract and plan conventions.
 Use the plan named by the user; `planboard boards` lists known boards. Create a
 new plan without a specified location with `planboard init`: the default is

@@ -8,6 +8,7 @@ import { STATUS_ORDER, ago, anchorKeyOf, clock, cssEscape, dayLabel, describeEve
 import { createWhiteboardHost } from "./whiteboard.js";
 import { numberedSections } from "./outline.js";
 import { setupPanelResize } from "./resize.js";
+import { anchorForHash, samePageHash } from "./links.js";
 
 const bootEl = document.getElementById("planboard-state");
 let state = JSON.parse(bootEl.textContent);
@@ -961,7 +962,7 @@ function noteBubble(n, { showAnchor = false } = {}) {
   const depthTag = mine && n.depth && n.depth !== "normal" ? `<span class="depth-tag ${esc(n.depth)}" title="You asked for a ${esc(n.depth)} answer">${esc(n.depth)}</span>` : "";
   const kindTag = n.kind === "sketch" ? `<span class="kind-tag" title="Drawn on the whiteboard">✎ sketch</span>` : "";
   const anchorChip = showAnchor && anchorKeyOf(n.anchor) !== "board" ? `<button type="button" class="anchor-chip" data-anchor='${esc(JSON.stringify(n.anchor))}'>${esc(n.label || labelFor(n.anchor))}</button>` : "";
-  const body = n.text ? (mine ? `<div class="bubble-text">${esc(n.text).replace(/\n/g, "<br>")}</div>` : `<div class="bubble-text md">${n.html || esc(n.text)}</div>`) : "";
+  const body = n.text ? `<div class="bubble-text md">${n.html || esc(n.text).replace(/\n/g, "<br>")}</div>` : "";
   const quoteText = mine ? n.quote || (n.anchor && n.anchor.type === "text" ? n.anchor.quote : "") : "";
   const quote = quoteText ? `<blockquote class="bubble-quote">${esc(quoteText)}</blockquote>` : "";
   return `<div class="bubble ${mine ? "mine" : "agent"} state-${esc(n.state)}${n.kind === "sketch" ? " sketch" : ""}" data-note="${esc(n.id)}">
@@ -1395,6 +1396,25 @@ setInterval(() => {
 
 // ---------------------------------------------------------------- boot
 
+function followHash() {
+  const anchor = anchorForHash(location.hash, state);
+  if (!anchor) return;
+  select(anchor, { focus: false, scrollTo: true });
+}
+document.addEventListener("click", event => {
+  if (event.defaultPrevented || event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
+  const link = event.target instanceof Element ? event.target.closest("a[href]") : null;
+  if (!link || link.hasAttribute("download") || (link.target && link.target !== "_self")) return;
+  const hash = samePageHash(link.getAttribute("href"), location.href);
+  if (!hash || !anchorForHash(hash, state)) return;
+  event.preventDefault();
+  event.stopPropagation();
+  if (location.hash !== hash) history.pushState(null, "", hash);
+  followHash();
+}, true);
+window.addEventListener("hashchange", followHash);
+window.addEventListener("popstate", followHash);
+
 const themeToggle = $("#themeToggle");
 function updateThemeToggle() {
   const dark = document.documentElement.dataset.theme === "dark";
@@ -1422,5 +1442,6 @@ updateThemeToggle();
 renderBoard();
 renderTopbar();
 renderPanel();
+followHash();
 connect();
 touchVisit();

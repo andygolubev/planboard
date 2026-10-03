@@ -33,6 +33,10 @@ export const DEPTH_GUIDE = `Note depth (the user picks it per note: quick · nor
           settings of the session that runs \`planboard poll\` (configured in the agent harness).`;
 
 export const WORKFLOW = `Review loop
+  Make file changes only by default. Do not create commits or new Git branches,
+  and do not push changes, unless the user explicitly asks for that Git action.
+  A plan item, review note, or completed implementation is not permission to commit
+  or create a branch. Leave Git actions to the user unless explicitly requested.
   Plan location: honor an explicit path or continue using an existing plan. For a new
   plan without a specified path, run \`planboard init\`: it creates .planboard/PLAN.md
   at the repository root (current directory outside Git). In commands below,
@@ -166,6 +170,7 @@ export function feedbackNextStep(planPath, notes) {
   if (notes.some((n) => n.attachments && n.attachments.length)) hints.push("some notes carry attachments: look at each attached image (its path is in the note) before answering");
   if (notes.some((n) => n.kind === "sketch")) hints.push("a sketch note is the user's whiteboard edit of a diagram: its text lists what moved, the PNG shows it, the .excalidraw file is the exact scene - change the mermaid source in the plan to match");
   return (
+    `Modify files only; do not create commits, create branches, or push unless the user explicitly requests that Git action. ` +
     `Handle every note (${ids}): read its thread, edit ${planPath} where the plan should change, ` +
     `flip statuses with \`planboard set ${planPath} <item-id> <status>\`, and reply to each with ` +
     `\`planboard reply ${planPath} --to <note-id> "<short answer>"\` so the answer appears next to the item. ` +
@@ -237,6 +242,11 @@ For new plans without an explicit path, run \`planboard init\` to create
 explicit paths and keep existing plans in place. Replace PLAN.md below with the
 actual chosen plan path.
 
+Make file changes only by default. Do not create commits or new Git branches,
+and do not push changes, unless the user explicitly asks for that Git action.
+A plan item, review note, or completed implementation is not permission to commit
+or create a branch. Leave Git actions to the user unless explicitly requested.
+
 Use the planboard skill for the full review loop. Poll with
 \`planboard poll PLAN.md --timeout 30 --owner "Cursor"\` in the foreground, shortening
 the timeout if needed to fit the terminal tool's limit. Collect any tracked command's
@@ -250,6 +260,10 @@ export const AGENTS_MD_SECTION = `
 ## planboard
 
 This project reviews its Markdown plan on a live board with the user.
+Make file changes only by default. Do not create commits or new Git branches,
+and do not push changes, unless the user explicitly asks for that Git action.
+A plan item, review note, or completed implementation is not permission to commit
+or create a branch. Leave Git actions to the user unless explicitly requested.
 For a new plan, use \`planboard init\` to create .planboard/PLAN.md at the repository
 root. Honor explicitly chosen paths and keep existing plans in their current location.
 In the commands below, replace PLAN.md with the actual chosen path.
@@ -276,6 +290,11 @@ description: Review a Markdown plan with the user on a live Planboard board. Use
 ---
 
 # planboard for ${host}
+
+Make file changes only by default. Do not create commits or new Git branches,
+and do not push changes, unless the user explicitly asks for that Git action.
+A plan item, review note, or completed implementation is not permission to commit
+or create a branch. Leave Git actions to the user unless explicitly requested.
 
 Run \`planboard --help\` for the current command contract and plan conventions.
 Use the plan named by the user; \`planboard boards\` lists known boards. Create a

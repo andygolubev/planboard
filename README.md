@@ -42,6 +42,11 @@ time; without it the board simply has no whiteboard button.
 
 ## The plan file
 
+Links work in plan text and in both user and agent discussion messages, including
+plain URLs and Markdown links. Link to a section, item, or diagram with its stable
+ID, such as `#breaking` or `http://localhost:4747/boards/<key>#breaking`. Opening
+a board link reveals a collapsed target and opens its discussion.
+
 Run `planboard init` to create `.planboard/PLAN.md` at the repository root, even
 from a subdirectory. Outside Git, it uses `.planboard/PLAN.md` in the current
 directory. The folder is created automatically. To choose another location, run
@@ -87,6 +92,9 @@ Plain bullets without a checkbox are notes, not tracked items. Raw HTML/SVG pass
 a plan with the conventions in a comment.
 
 ## The loop
+
+Planboard agents modify files by default. They must not create commits, create
+branches, or push unless the user explicitly requests that Git action.
 
 ```
 you                                  agent

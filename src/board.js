@@ -178,7 +178,7 @@ export class Board extends EventEmitter {
 
   decorateNote(note) {
     const out = { ...note };
-    if (note.from === "agent") out.html = renderMarkdown(note.text);
+    out.html = renderMarkdown(note.text);
     out.label = this.anchorLabel(note.anchor);
     return out;
   }

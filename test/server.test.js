@@ -291,3 +291,15 @@ test("editing the file on disk is picked up by the watcher", async () => {
   const st = await api("GET", `/boards/${key}/api/state`);
   assert.ok(st.json.recent_events.some((e) => e.type === "added" && e.item === "gamma"));
 });
+
+
+test("user notes expose safe clickable Markdown and plain links in responses and state", async () => {
+  const r = await api("POST", `/boards/${key}/api/notes`, { anchor: { type: "board" }, text: "[Section](#breaking) https://example.com/ <script>alert(1)</script>" });
+  assert.equal(r.status, 200);
+  assert.match(r.json.note.html, /href="#breaking"/);
+  assert.match(r.json.note.html, /href="https:\/\/example.com\/"/);
+  assert.doesNotMatch(r.json.note.html, /<script>/);
+  const state = await api("GET", `/boards/${key}/api/state`);
+  assert.equal(state.json.notes.find(n => n.id === r.json.note.id).html, r.json.note.html);
+  await api("DELETE", `/boards/${key}/api/notes/${r.json.note.id}`);
+});

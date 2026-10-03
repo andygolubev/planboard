@@ -1,0 +1,7 @@
+Generated with the built-in image_gen tool.
+
+Day prompt:
+Create an original wide landscape illustration for a calm productivity app background, 1536x1024 or wider landscape. Snowy alpine valley, majestic irregular jagged peaks, layered pale blue glacial slopes, tiny pine forests on sweeping foreground ridges, a winding snowy valley leading into distance, spacious powder-blue sky with delicate wispy clouds. Soft ivory sun in upper left, no dramatic glare. Refined detailed flat editorial illustration with subtle painted texture and geometric facets, sophisticated desaturated glacier blue and slate palette, natural asymmetric composition. Not a UI mockup, no text, logos, watermark, borders or frames. Compose the highest peaks toward sides and lower half, quiet open central sky so interface can overlay the center. Fresh, serene winter morning, no people or buildings. Deliver a single finished artwork.
+
+Night prompt (edit of the generated day image):
+Create the matching night variant of this original alpine workspace background. Preserve exactly the same mountain silhouettes, pine forests, clouds, framing and calm illustrated visual style. Change only time of day: desaturated deep midnight blue sky, a softly glowing ivory moon in exactly the sun's position, faint sparse stars, cool silver moonlight on snow, darker layered blue slopes and forest. The moon must remain clearly visible. Keep the snowy details legible, no black crushing, no dramatic bright aurora, no extra objects, no text. Same aspect ratio and composition.
