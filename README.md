@@ -9,7 +9,14 @@ that item - through a long poll, edits the plan, flips statuses as work lands, a
 next to the item. Notes, replies and the status history persist beside the plan, so the same
 board serves the whole project day after day. The plan is the conversation; the chat log is not.
 
-![planboard showing the fictional community garden example](docs/board.jpg)
+![planboard in light theme: numbered contents, expandable tasks, and an item discussion](docs/board.jpg)
+
+<details>
+<summary>See the dark theme</summary>
+
+![planboard in dark theme with the moonlit alpine background](docs/board-dark.jpg)
+
+</details>
 
 ## Why
 
@@ -357,11 +364,13 @@ visits, attachments, or saved whiteboard scenes; `snapshot.json` matches the exa
 Regenerate the documentation screenshots with:
 
 ```sh
+npm run build                    # refresh the browser bundle and theme assets
 npx playwright install chromium  # once, for screenshot development
 npm run screenshots
 ```
 
 The script opens a temporary copy of the example, adds synthetic review notes and changes,
-and captures the real board and Changes tab. It never adds review or visit history to the
-checked-in example. To use an existing Chromium-based browser, set `PLANBOARD_BROWSER` to
-its executable path. The screenshots are illustrative fixtures, not a captured user session.
+and captures the real board in light and dark themes, plus the Changes tab. It never adds
+review or visit history to the checked-in example. To use an existing Chromium-based browser,
+set `PLANBOARD_BROWSER` to its executable path. The screenshots are illustrative fixtures,
+not a captured user session.
