@@ -594,6 +594,7 @@ function renderBoardPage(board) {
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 viewBox=%270 0 32 32%27%3E%3Crect width=%2732%27 height=%2732%27 rx=%277%27 fill=%27%232456d6%27/%3E%3Cpath d=%27M9 16.5l4.5 4.5L23 12%27 fill=%27none%27 stroke=%27%23fff%27 stroke-width=%273.2%27 stroke-linecap=%27round%27 stroke-linejoin=%27round%27/%3E%3C/svg%3E">
 <link rel="stylesheet" href="/client/board.css">
 <script id="planboard-state" type="application/json">${json}</script>
+<script>try { const t = localStorage.getItem("pb:theme"); document.documentElement.dataset.theme = t === "light" || t === "dark" ? t : matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light"; } catch { document.documentElement.dataset.theme = matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light"; }</script>
 </head>
 <body>
 <header class="topbar" id="topbar">
@@ -602,26 +603,25 @@ function renderBoardPage(board) {
   <div class="progress" id="progress"></div>
   <button type="button" class="changes-chip" id="changesChip" hidden></button>
   <div class="spacer"></div>
+  <button type="button" class="top-link theme-toggle" id="themeToggle">Dark</button>
   <a class="top-link" id="exportLink" href="/boards/${escapeHtml(state.key)}/api/export?download" title="Download the plan with all threads as one Markdown file">Export</a>
   <button type="button" class="top-link" id="helpBtn" title="Keyboard shortcuts (?)">?</button>
   <div class="presence-wrap" id="presence"></div>
 </header>
 <div class="layout" id="layout">
+  <nav class="contents" aria-label="Plan contents"><div class="contents-title">Contents</div><div id="contentsLinks"></div></nav>
+  <div class="panel-resizer" data-resize-panel="left" role="separator" tabindex="0" aria-label="Resize contents" aria-orientation="vertical" title="Drag to resize contents. Use arrow keys when focused; double-click to reset."></div>
   <div class="board-wrap">
-    <div class="toolbar" id="toolbar">
-      <span class="toolbar-label">Show</span>
-      <button type="button" class="filter" data-filter="open" title="Hide done and dropped items (o)">Open</button>
-      <button type="button" class="filter" data-filter="changed" title="Only what changed since your last visit (c)">Changed</button>
-      <button type="button" class="filter" data-filter="notes" title="Only items with notes (t)">With notes</button>
-      <span class="toolbar-count" id="filterCount"></span>
+    <div class="toolbar" id="toolbar" hidden>
       <span class="spacer"></span>
-      <button type="button" class="toolbar-btn" id="collapseBtn" title="Expand or collapse the finished sections">Collapse done</button>
+      <button type="button" class="toolbar-btn" id="collapseBtn" title="Expand or collapse all section details and tasks">Expand all</button>
     </div>
     <main id="board" class="board"></main>
     <div class="ruler" id="ruler" title="Where the changes and notes are - click to jump"></div>
   </div>
+  <div class="panel-resizer" data-resize-panel="right" role="separator" tabindex="0" aria-label="Resize discussion" aria-controls="panel" aria-orientation="vertical" title="Drag to resize discussion. Use arrow keys when focused; double-click to reset."></div>
   <aside class="panel" id="panel">
-    <button type="button" class="sheet-handle" id="sheetHandle" aria-label="Open the notes panel"><span class="sheet-grip"></span><span class="sheet-title" id="sheetTitle">Whole plan</span><span class="sheet-badge" id="sheetBadge" hidden></span></button>
+    <button type="button" class="sheet-handle" id="sheetHandle" aria-label="Open the notes panel"><span class="sheet-grip"></span><span class="sheet-title" id="sheetTitle">Plan</span><span class="sheet-badge" id="sheetBadge" hidden></span></button>
     <div class="panel-head">
       <div class="panel-context" id="panelContext"></div>
       <nav class="tabs" id="tabs">
@@ -633,18 +633,13 @@ function renderBoardPage(board) {
     <div class="panel-scroll" id="panelScroll"></div>
     <form class="composer" id="composer">
       <div class="attach-strip" id="attachStrip" hidden></div>
-      <textarea id="composerText" rows="3" placeholder="Note on the whole plan… (Enter adds, ⌘/Ctrl+Enter adds and sends)"></textarea>
+      <textarea id="composerText" rows="3" placeholder="Note on the plan… (Enter adds, ⌘/Ctrl+Enter adds and sends)"></textarea>
       <div class="composer-row">
-        <div class="depth" id="depth" title="How hard the agent should work on this note">
-          <button type="button" data-depth="quick" title="Quick: a short answer from what the agent knows, trivial edits only">quick</button>
-          <button type="button" data-depth="normal" class="active" title="Normal: read, change, verify, reply briefly">normal</button>
-          <button type="button" data-depth="deep" title="Deep: research, weigh alternatives, implement and verify, explain the reasoning">deep</button>
-        </div>
         <button type="button" class="icon-btn" id="attachBtn" title="Attach a screenshot (or paste / drop one)">📎</button>
         <input type="file" id="attachInput" accept="image/png,image/jpeg,image/gif,image/webp" multiple hidden>
         <span class="composer-hint" id="composerHint"></span>
-        <button type="button" class="btn ghost" id="sendBtn" disabled>Send</button>
-        <button type="submit" class="btn primary" id="addBtn">Add note</button>
+        <button type="button" class="btn ghost" id="sendBtn" title="Send all queued notes. While typing, Command+Enter on Mac or Ctrl+Enter on Linux and Windows also adds the current draft and sends it." disabled>Send</button>
+        <button type="submit" class="btn primary" id="addBtn" title="Add this note to the queue (Enter while typing)">Add note</button>
       </div>
     </form>
   </aside>
@@ -662,9 +657,8 @@ function renderBoardPage(board) {
     <dl>
       <dt>j / k</dt><dd>next / previous item</dd>
       <dt>Enter</dt><dd>open the item's thread and write</dd>
-      <dt>Esc</dt><dd>back to the whole plan (closes overlays first)</dd>
+      <dt>Esc</dt><dd>back to the plan (closes overlays first)</dd>
       <dt>n / p</dt><dd>next / previous change since your last visit</dd>
-      <dt>o · c · t</dt><dd>toggle the Open · Changed · With notes filters</dd>
       <dt>1 · 2 · 3</dt><dd>Thread · Activity · Changes tab</dd>
       <dt>?</dt><dd>this help</dd>
     </dl>

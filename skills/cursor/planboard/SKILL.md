@@ -5,10 +5,26 @@ description: Review a Markdown plan with the user on a live Planboard board. Use
 
 # planboard for Cursor
 
+Make file changes only by default. Do not create commits or new Git branches,
+and do not push changes, unless the user explicitly asks for that Git action.
+A plan item, review note, or completed implementation is not permission to commit
+or create a branch. Leave Git actions to the user unless explicitly requested.
+
 Run `planboard --help` for the current command contract and plan conventions.
 Use the plan named by the user; `planboard boards` lists known boards. Create a
-missing plan with `planboard init PLAN.md`, then edit its concrete tasks. Keep
-existing item and heading {#id} anchors stable so their threads stay attached.
+new plan without a specified location with `planboard init`: the default is
+.planboard/PLAN.md at the repository root, or under the current directory outside Git.
+Honor an explicitly chosen path with `planboard init <path>`; keep existing plans
+in place. In every command below, replace PLAN.md with the actual chosen plan path.
+Edit its concrete tasks and keep existing item and heading {#id} anchors stable
+so their threads stay attached.
+
+Keep sections in their intended reading and execution order. Use one # title,
+## for main sections, ### for subsections, and deeper levels only within their
+parent; do not skip heading levels. Insert new sections under the correct parent
+at the appropriate position. Do not reorder existing sections unless the user
+asks or the change requires it. Contents numbering is automatic (1, 1.1, 1.1.1);
+do not type numeric prefixes into headings or change stable {#id} anchors.
 
 Open with `planboard PLAN.md`. If browser launch is unavailable, use
 `planboard PLAN.md --no-open` and give the user the printed URL. The daemon and

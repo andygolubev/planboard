@@ -25,6 +25,7 @@ const options = {
 
 function copyCss() {
   fs.copyFileSync(path.join(root, "client", "board.css"), path.join(outDir, "board.css"));
+  fs.cpSync(path.join(root, "client", "assets"), path.join(outDir, "assets"), { recursive: true });
 }
 
 // The Excalidraw whiteboard frame comes prebuilt from lavish-axi (dev dependency):

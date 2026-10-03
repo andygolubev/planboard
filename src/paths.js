@@ -6,6 +6,19 @@ import path from "node:path";
 export const APP = "planboard";
 export const DEFAULT_PORT = 4747;
 
+// A .git directory or worktree .git file marks the nearest repository root.
+// Outside a repository, keep the default local to the current directory.
+export function defaultPlanPath(cwd = process.cwd()) {
+  const start = path.resolve(cwd);
+  let dir = start;
+  while (true) {
+    if (fs.existsSync(path.join(dir, ".git"))) return path.join(dir, ".planboard", "PLAN.md");
+    const parent = path.dirname(dir);
+    if (parent === dir) return path.join(start, ".planboard", "PLAN.md");
+    dir = parent;
+  }
+}
+
 export function stateRoot() {
   return process.env.PLANBOARD_HOME || path.join(os.homedir(), ".planboard");
 }

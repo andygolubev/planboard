@@ -14,6 +14,11 @@ export const CONVENTIONS = `PLAN.md conventions
     state, class, ER...). Node ids in the diagram are what the user clicks on.
   - ![caption](relative/path.png) images render and can be pinned at a point.
   - Front matter (--- title: ... ---) is optional; the first # heading is the title.
+  - Preserve section order and hierarchy: one # title, ## main sections, ###
+    subsections. Do not skip levels. Insert new sections under the correct parent
+    in the intended reading/execution order. Reorder only when requested or needed
+    by the change. Contents numbering is automatic; do not number heading text
+    manually or rename stable {#id} anchors.
   - Everything else is ordinary Markdown; raw HTML/SVG passes through.`;
 
 export const DEPTH_GUIDE = `Note depth (the user picks it per note: quick · normal · deep)
@@ -28,6 +33,14 @@ export const DEPTH_GUIDE = `Note depth (the user picks it per note: quick · nor
           settings of the session that runs \`planboard poll\` (configured in the agent harness).`;
 
 export const WORKFLOW = `Review loop
+  Make file changes only by default. Do not create commits or new Git branches,
+  and do not push changes, unless the user explicitly asks for that Git action.
+  A plan item, review note, or completed implementation is not permission to commit
+  or create a branch. Leave Git actions to the user unless explicitly requested.
+  Plan location: honor an explicit path or continue using an existing plan. For a new
+  plan without a specified path, run \`planboard init\`: it creates .planboard/PLAN.md
+  at the repository root (current directory outside Git). In commands below,
+  PLAN.md means the chosen plan path; always pass that actual path.
   1. Write or update PLAN.md, then run \`planboard <PLAN.md>\` once to open the
      board (it prints the URL; re-running is harmless). The board re-renders
      live on every save, so keep editing the file - never regenerate HTML.
@@ -87,7 +100,8 @@ Commands
                                        the plan with every thread folded in under its item plus the status
                                        history, as one Markdown file (stdout unless --out) - for project records
   planboard lint <PLAN.md>             report items without ids, duplicate ids
-  planboard init [PLAN.md]             scaffold a plan file with the conventions
+  planboard init [path]                scaffold a plan; default: <repo>/.planboard/PLAN.md
+                                       outside Git: <cwd>/.planboard/PLAN.md; explicit paths are honored
   planboard boards                     list boards the server knows
   planboard setup claude [--global] [--hook]
                                        install the Claude Code skill (project or ~/.claude); --hook adds a SessionStart hook
@@ -156,6 +170,7 @@ export function feedbackNextStep(planPath, notes) {
   if (notes.some((n) => n.attachments && n.attachments.length)) hints.push("some notes carry attachments: look at each attached image (its path is in the note) before answering");
   if (notes.some((n) => n.kind === "sketch")) hints.push("a sketch note is the user's whiteboard edit of a diagram: its text lists what moved, the PNG shows it, the .excalidraw file is the exact scene - change the mermaid source in the plan to match");
   return (
+    `Modify files only; do not create commits, create branches, or push unless the user explicitly requests that Git action. ` +
     `Handle every note (${ids}): read its thread, edit ${planPath} where the plan should change, ` +
     `flip statuses with \`planboard set ${planPath} <item-id> <status>\`, and reply to each with ` +
     `\`planboard reply ${planPath} --to <note-id> "<short answer>"\` so the answer appears next to the item. ` +
@@ -198,7 +213,7 @@ flowchart LR
 <!--
 Conventions: [ ] todo · [~] in progress · [x] done · [!] blocked · [?] decision · [-] dropped.
 Every item and heading ends with {#id}; ids never change once discussed.
-Run: planboard PLAN.md  (open)   planboard poll PLAN.md  (wait for notes)
+Run: planboard <path-to-this-file>  (open)   planboard poll <path-to-this-file>  (wait for notes)
 -->
 `;
 
@@ -222,6 +237,16 @@ Current guidance lives in the CLI, not in this file:
 - \`planboard thread <PLAN.md> <id>\` to read what was already discussed about an item
 - \`planboard export <PLAN.md>\` to write the plan with all threads as one Markdown file
 
+For new plans without an explicit path, run \`planboard init\` to create
+.planboard/PLAN.md at the repository root (current directory outside Git). Honor
+explicit paths and keep existing plans in place. Replace PLAN.md below with the
+actual chosen plan path.
+
+Make file changes only by default. Do not create commits or new Git branches,
+and do not push changes, unless the user explicitly asks for that Git action.
+A plan item, review note, or completed implementation is not permission to commit
+or create a branch. Leave Git actions to the user unless explicitly requested.
+
 Use the planboard skill for the full review loop. Poll with
 \`planboard poll PLAN.md --timeout 30 --owner "Cursor"\` in the foreground, shortening
 the timeout if needed to fit the terminal tool's limit. Collect any tracked command's
@@ -234,7 +259,20 @@ ends the review. A detached process does not keep an ended turn listening.
 export const AGENTS_MD_SECTION = `
 ## planboard
 
-This project keeps its plan in PLAN.md and reviews it on a live board with the user.
+This project reviews its Markdown plan on a live board with the user.
+Make file changes only by default. Do not create commits or new Git branches,
+and do not push changes, unless the user explicitly asks for that Git action.
+A plan item, review note, or completed implementation is not permission to commit
+or create a branch. Leave Git actions to the user unless explicitly requested.
+For a new plan, use \`planboard init\` to create .planboard/PLAN.md at the repository
+root. Honor explicitly chosen paths and keep existing plans in their current location.
+In the commands below, replace PLAN.md with the actual chosen path.
+Keep sections in their intended reading and execution order. Use one # title,
+## for main sections, ### for subsections, and deeper levels only within their
+parent; do not skip heading levels. Insert new sections under the correct parent
+at the appropriate position. Do not reorder existing sections unless the user
+asks or the change requires it. Contents numbering is automatic (1, 1.1, 1.1.1);
+do not type numeric prefixes into headings or change stable {#id} anchors.
 Run \`planboard --help\` for the conventions and the loop; \`planboard show PLAN.md\` shows the
 plan with ids and note counts; \`planboard poll PLAN.md --owner "<model>, effort <level>"\`
 waits for the user's notes; answer with \`planboard reply\`, flip statuses with \`planboard set\`;
@@ -253,10 +291,26 @@ description: Review a Markdown plan with the user on a live Planboard board. Use
 
 # planboard for ${host}
 
+Make file changes only by default. Do not create commits or new Git branches,
+and do not push changes, unless the user explicitly asks for that Git action.
+A plan item, review note, or completed implementation is not permission to commit
+or create a branch. Leave Git actions to the user unless explicitly requested.
+
 Run \`planboard --help\` for the current command contract and plan conventions.
 Use the plan named by the user; \`planboard boards\` lists known boards. Create a
-missing plan with \`planboard init PLAN.md\`, then edit its concrete tasks. Keep
-existing item and heading {#id} anchors stable so their threads stay attached.
+new plan without a specified location with \`planboard init\`: the default is
+.planboard/PLAN.md at the repository root, or under the current directory outside Git.
+Honor an explicitly chosen path with \`planboard init <path>\`; keep existing plans
+in place. In every command below, replace PLAN.md with the actual chosen plan path.
+Edit its concrete tasks and keep existing item and heading {#id} anchors stable
+so their threads stay attached.
+
+Keep sections in their intended reading and execution order. Use one # title,
+## for main sections, ### for subsections, and deeper levels only within their
+parent; do not skip heading levels. Insert new sections under the correct parent
+at the appropriate position. Do not reorder existing sections unless the user
+asks or the change requires it. Contents numbering is automatic (1, 1.1, 1.1.1);
+do not type numeric prefixes into headings or change stable {#id} anchors.
 
 Open with \`planboard PLAN.md\`. If browser launch is unavailable, use
 \`planboard PLAN.md --no-open\` and give the user the printed URL. The daemon and

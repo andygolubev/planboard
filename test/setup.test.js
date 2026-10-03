@@ -52,6 +52,8 @@ for (const global of [false, true]) {
     assert.match(skill, /^---\nname: planboard\ndescription: [^\n]+\n---\n/);
     assert.match(skill, /planboard poll PLAN.md --timeout 30/);
     assert.match(skill, /planboard reply PLAN.md --to <note-id>/);
+    assert.match(skill, /Do not create commits or new Git branches/);
+    assert.match(skill, /unless the user explicitly asks for that Git action/);
     assert.doesNotMatch(skill, /\$ARGUMENTS|run_in_background|\/planboard/);
     assert.equal(skill, fs.readFileSync(path.join(root, "skills", "codex", "planboard", "SKILL.md"), "utf8"));
     assert.equal(f.run(...args).status, 0);

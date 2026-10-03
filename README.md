@@ -9,7 +9,14 @@ that item - through a long poll, edits the plan, flips statuses as work lands, a
 next to the item. Notes, replies and the status history persist beside the plan, so the same
 board serves the whole project day after day. The plan is the conversation; the chat log is not.
 
-![planboard showing the fictional community garden example](docs/board.jpg)
+![planboard in light theme: numbered contents, expandable tasks, and an item discussion](docs/board.jpg)
+
+<details>
+<summary>See the dark theme</summary>
+
+![planboard in dark theme with the moonlit alpine background](docs/board-dark.jpg)
+
+</details>
 
 ## Why
 
@@ -41,6 +48,22 @@ Node 22 or newer. Everything runs locally; the only network use is your browser 
 time; without it the board simply has no whiteboard button.
 
 ## The plan file
+
+Links work in plan text and in both user and agent discussion messages, including
+plain URLs and Markdown links. Link to a section, item, or diagram with its stable
+ID, such as `#breaking` or `http://localhost:4747/boards/<key>#breaking`. Opening
+a board link reveals a collapsed target and opens its discussion.
+
+Run `planboard init` to create `.planboard/PLAN.md` at the repository root, even
+from a subdirectory. Outside Git, it uses `.planboard/PLAN.md` in the current
+directory. The folder is created automatically. To choose another location, run
+`planboard init docs/launch.md`; explicit relative paths resolve from the current
+directory, and absolute paths are also supported. Existing plans stay where they are.
+
+Open the default plan with `planboard .planboard/PLAN.md` from the repository root.
+In the examples below, replace `PLAN.md` with your actual plan path.
+Notes and history live beside the plan by default, so the default plan uses
+`.planboard/PLAN.board/`. `PLANBOARD_STATE_DIR` still overrides the history location.
 
 Ordinary Markdown plus three conventions:
 
@@ -77,6 +100,9 @@ a plan with the conventions in a comment.
 
 ## The loop
 
+Planboard agents modify files by default. They must not create commits, create
+branches, or push unless the user explicitly requests that Git action.
+
 ```
 you                                  agent
 ────────────────────────────────     ──────────────────────────────────────
@@ -89,24 +115,26 @@ read the reply next to the item      planboard poll PLAN.md …
 ```
 
 - **Board** (left): the plan. Green check = done, half amber = in progress, red `!` = blocked,
-  purple `?` = needs your decision. Section headers carry a stacked progress bar; a section that
-  is 100 % done folds to its heading (chevron to unfold, **Collapse done / Expand done** for all).
+  purple `?` = needs your decision. Section headers carry a stacked progress bar. The **Contents** sidebar jumps to sections
+  and shows progress and section discussion counts. Contents numbers follow the
+  Markdown heading order automatically: `1`, `1.1`, `1.1.1`. The document title
+  is unnumbered. Use `##` for main sections and `###` for subsections; keep sections
+  in their intended order and do not type numbers into heading titles. Each second-level section has
+  independently expandable **Solution details** and **Tasks**; opening another section’s
+  details closes the previous one. **Expand all / Collapse all** controls the full outline.
+  **Discuss this section** opens its attached conversation. Expansion choices are saved
+  per board, and selecting a hidden item reveals its containing group.
   Items with notes carry a count badge (dashed = not sent yet, filled = waiting for the agent,
   green = agent answered last, 📎 = attachments). Items that changed since your last visit get a
   coloured left rail and a tag drawing the move (old-status dot → new-status dot). The thin
   **ruler** on the right edge is a minimap of where the changes and notes are along the whole
   plan - click a tick to jump.
-- **Filters** (toolbar): **Open** hides done and dropped items, **Changed** shows only what moved
-  since your last visit, **With notes** only items that have a thread; they combine, and the
-  count says how many items match.
 - **Panel** (right): the thread on whatever you selected - an item, a heading, a diagram node, an
   image point, a text selection, or the whole plan. **Activity** is everything in time order with
   day separators; **Changes** is the review view (below).
 - **Composer**: Enter adds a note (it stays "not sent" until you press **Send**, so you can walk
   the whole plan first); ⌘/Ctrl+Enter adds and sends; Esc goes back to the whole plan. You can
-  also flip an item's status yourself from the panel. Each note carries a **depth** - *quick*
-  (one-line answer, trivial edits), *normal*, *deep* (research, alternatives, verified change,
-  reasoning in the reply) - that tells the agent how hard to work on it. Paste or drop a
+  also flip an item's status yourself from the panel. Paste or drop a
   screenshot (or use 📎) to attach it: it is stored beside the plan and shown in the thread.
 - **Top bar**: the stacked status bar, the changes chip, **Export**, and agent presence - *no agent
   listening*, *agent is listening* (a poll is attached), *agent is working on your notes*
@@ -114,8 +142,7 @@ read the reply next to the item      planboard poll PLAN.md …
   see which model and effort level will read your notes: that is decided by the agent session that
   runs the poll, not by planboard, which never calls a model itself.
 - **Keyboard**: `j`/`k` move between items, `Enter` opens the thread and the note box, `Esc` goes
-  back to the whole plan, `n`/`p` walk through the changes, `o`/`c`/`t` toggle the filters,
-  `1`/`2`/`3` switch tabs, `?` shows the cheat sheet.
+  back to the whole plan, `n`/`p` walk through the changes, `1`/`2`/`3` switch tabs, `?` shows the cheat sheet.
 - **Phone**: under 900 px the panel is a bottom sheet - tap an item to open it, swipe it down with
   the handle or Esc.
 
@@ -337,11 +364,13 @@ visits, attachments, or saved whiteboard scenes; `snapshot.json` matches the exa
 Regenerate the documentation screenshots with:
 
 ```sh
+npm run build                    # refresh the browser bundle and theme assets
 npx playwright install chromium  # once, for screenshot development
 npm run screenshots
 ```
 
 The script opens a temporary copy of the example, adds synthetic review notes and changes,
-and captures the real board and Changes tab. It never adds review or visit history to the
-checked-in example. To use an existing Chromium-based browser, set `PLANBOARD_BROWSER` to
-its executable path. The screenshots are illustrative fixtures, not a captured user session.
+and captures the real board in light and dark themes, plus the Changes tab. It never adds
+review or visit history to the checked-in example. To use an existing Chromium-based browser,
+set `PLANBOARD_BROWSER` to its executable path. The screenshots are illustrative fixtures,
+not a captured user session.

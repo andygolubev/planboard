@@ -8,7 +8,7 @@ import os from "node:os";
 import path from "node:path";
 
 import { AGENTS_MD_SECTION, CODEX_SKILL_MD, CURSOR_RULE_MDC, CURSOR_SKILL_MD, OPENCODE_SKILL_MD, PLAN_TEMPLATE, SKILL_MD, helpText, openNextStep } from "./guidance.js";
-import { boardDir, canonicalPlanPath, defaultHost, defaultPort, ensureDir, planKey, readJson, serverInfoPath, serverLogPath, stateRoot } from "./paths.js";
+import { boardDir, canonicalPlanPath, defaultHost, defaultPlanPath, defaultPort, ensureDir, planKey, readJson, serverInfoPath, serverLogPath, stateRoot } from "./paths.js";
 import { exportMarkdown } from "./export.js";
 import { STATUSES, STATUS_LABEL, lint, normalizeStatus, parsePlan, setItemStatus } from "./plan.js";
 import { BoardStore, anchorKey } from "./store.js";
@@ -421,9 +421,10 @@ function cmdLint(planArg) {
 }
 
 function cmdInit(planArg, flags) {
-  const target = path.resolve(planArg || "PLAN.md");
+  const target = planArg ? path.resolve(planArg) : defaultPlanPath();
   if (fs.existsSync(target) && !flags.force) throw new CliError(`${target} exists (pass --force to overwrite)`);
-  const title = flags.title ? String(flags.title) : path.basename(path.dirname(target)) || "Plan";
+  const titleDir = planArg ? path.dirname(target) : path.dirname(path.dirname(target));
+  const title = flags.title ? String(flags.title) : path.basename(titleDir) || "Plan";
   ensureDir(path.dirname(target));
   fs.writeFileSync(target, PLAN_TEMPLATE(title));
   out(`wrote ${target}\nnext_step: edit it (keep the {#id} anchors and checkbox statuses), then run \`planboard ${path.relative(process.cwd(), target) || target}\` to open the board.`);

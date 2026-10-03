@@ -45,8 +45,12 @@ try {
   const errors = [];
   page.on("pageerror", (error) => errors.push(error.message));
   await page.goto(board.url);
+  await page.locator('.section-disclosure[data-owner="site"][data-kind="tasks"] > summary').click();
   await page.locator('[data-item="site-soil"]').waitFor();
-  await page.locator('figure.diagram svg').waitFor();
+  await page.locator('figure.diagram svg').waitFor({ state: "attached" });
+  // Give the review panel enough room for both the conversation and change flow.
+  await page.locator('[data-resize-panel="right"]').focus();
+  for (let i = 0; i < 8; i++) await page.keyboard.press("ArrowLeft");
   assert.equal(board.store.notes.length, 0);
   assert.equal(board.store.events.length, 0);
 
@@ -68,12 +72,34 @@ try {
     if (err.name !== "AbortError") throw err;
   });
   await page.locator("#presence").filter({ hasText: "Review agent" }).waitFor();
+  // Wait for the actual theme asset and fonts before capturing the real UI.
+  const readyForCapture = async () => {
+    await page.evaluate(async () => {
+      await document.fonts.ready;
+      const background = getComputedStyle(document.body).backgroundImage;
+      const url = background.match(/url\(["']?(.*?)["']?\)/)?.[1];
+      if (url) {
+        const image = new Image();
+        image.src = url;
+        await image.decode();
+      }
+    });
+    await page.mouse.move(0, 0);
+  };
+  await readyForCapture();
   await page.screenshot({ path: path.join(root, "docs", "board.jpg"), type: "jpeg", quality: 90 });
+  await page.locator("#themeToggle").click();
+  await page.locator('html[data-theme="dark"]').waitFor();
+  await readyForCapture();
+  await page.screenshot({ path: path.join(root, "docs", "board-dark.jpg"), type: "jpeg", quality: 90 });
+  await page.locator("#themeToggle").click();
+  await page.locator('html[data-theme="light"]').waitFor();
   await page.locator('[data-tab="changes"]').click();
   await page.locator("#panelScroll .change-row").first().waitFor();
+  await readyForCapture();
   await page.screenshot({ path: path.join(root, "docs", "changes.jpg"), type: "jpeg", quality: 90 });
   assert.deepEqual(errors, [], "the board must render without browser exceptions");
-  console.log("Captured docs/board.jpg and docs/changes.jpg; browser rendering and CLI review loop passed.");
+  console.log("Captured docs/board.jpg, docs/board-dark.jpg, and docs/changes.jpg; browser rendering and CLI review loop passed.");
 } finally {
   pollAbort.abort();
   if (listener) await listener;

@@ -1,11 +1,14 @@
 // The board in the browser. One document, no iframe: the plan HTML comes from the
-// server, this script adds selection, notes, diagrams, filters, keyboard, live
+// server, this script adds selection, notes, diagrams, keyboard, live
 // updates, the change-review graphics and the whiteboard overlay.
 import mermaid from "mermaid";
 
 import { renderChangesPanel, changeGroups } from "./changes.js";
 import { STATUS_ORDER, ago, anchorKeyOf, clock, cssEscape, dayLabel, describeEvent as describeEv, esc, eventKey, fileSize } from "./util.js";
 import { createWhiteboardHost } from "./whiteboard.js";
+import { numberedSections } from "./outline.js";
+import { setupPanelResize } from "./resize.js";
+import { anchorForHash, samePageHash } from "./links.js";
 
 const bootEl = document.getElementById("planboard-state");
 let state = JSON.parse(bootEl.textContent);
@@ -17,7 +20,6 @@ const $ = (sel, root = document) => root.querySelector(sel);
 const boardEl = $("#board");
 const rulerEl = $("#ruler");
 const toolbarEl = $("#toolbar");
-const filterCountEl = $("#filterCount");
 const collapseBtn = $("#collapseBtn");
 const panelEl = $("#panel");
 const panelScroll = $("#panelScroll");
@@ -27,7 +29,6 @@ const composerText = $("#composerText");
 const composerHint = $("#composerHint");
 const sendBtn = $("#sendBtn");
 const addBtn = $("#addBtn");
-const depthEl = $("#depth");
 const attachBtn = $("#attachBtn");
 const attachInput = $("#attachInput");
 const attachStrip = $("#attachStrip");
@@ -41,19 +42,18 @@ const sheetBadge = $("#sheetBadge");
 const helpOverlay = $("#helpOverlay");
 
 let selection = { type: "board" };
-let selectionLabel = "Whole plan";
+let selectionLabel = "Plan";
 let tab = "thread";
 let since = state.since || null;
 let sinceBasis = state.since_basis || "open";
 let connected = false;
 let mermaidCounter = 0;
 let tempPin = null;
-let depth = "normal";
 let pendingFiles = [];
 const review = { index: -1 };
 const beforeMode = new Set();
-let filters = loadJson("filters", { open: false, changed: false, notes: false });
-const expanded = new Set(loadJson("expanded", []));
+const expanded = new Set(loadJson("sectionDetails", []));
+const taskExpanded = new Set(loadJson("sectionTasks", []));
 
 function loadJson(key, fallback) {
   try {
@@ -89,7 +89,7 @@ function sectionById(id) {
 }
 
 function labelFor(anchor) {
-  if (!anchor || anchor.type === "board") return "Whole plan";
+  if (!anchor || anchor.type === "board") return "Plan";
   switch (anchor.type) {
     case "item":
     case "text": {
@@ -103,7 +103,7 @@ function labelFor(anchor) {
         const sec = sectionById(anchor.section);
         return sec ? sec.title : anchor.section;
       }
-      return "Whole plan";
+      return "Plan";
     }
     case "section": {
       const sec = sectionById(anchor.section);
@@ -147,7 +147,6 @@ async function refreshState() {
 }
 
 const isPhone = () => window.matchMedia("(max-width: 900px)").matches;
-const anyFilter = () => filters.open || filters.changed || filters.notes;
 
 // ---------------------------------------------------------------- board
 
@@ -159,15 +158,15 @@ function renderBoard() {
   }
   boardEl.innerHTML = `<article class="plan">${state.html}</article>`;
   boardEl.scrollTop = scroll;
+  buildOutline();
   renderDiagrams();
   paint();
 }
 
-// Decorations, collapse, filters and the ruler always go together.
+// Decorations, collapse and the ruler always go together.
 function paint() {
   decorateBoard();
   applyCollapse();
-  applyFilters();
   renderRuler();
   renderSheetHandle();
 }
@@ -179,7 +178,7 @@ function beforeSourceOf(diagramId) {
 }
 
 async function renderDiagrams() {
-  const dark = window.matchMedia("(prefers-color-scheme: dark)").matches;
+  const dark = document.documentElement.dataset.theme === "dark";
   mermaid.initialize({ startOnLoad: false, theme: dark ? "dark" : "neutral", securityLevel: "strict", fontFamily: "inherit" });
   for (const fig of boardEl.querySelectorAll("figure.diagram")) await renderDiagram(fig);
   paint();
@@ -371,123 +370,110 @@ function decorateBoard() {
   }
 }
 
-// ---- collapse finished sections ------------------------------------------------
-
-function sectionLevel(h) {
-  return Number(h.dataset.level) || Number((h.tagName || "H2").slice(1)) || 2;
+// ---- section outline and progressive disclosure --------------------------------
+function buildOutline() {
+  const plan = boardEl.querySelector(".plan");
+  const nodes = [...plan.children];
+  let card = null;
+  let content = [];
+  function finish() {
+    if (!card) return;
+    const id = card.dataset.outline;
+    const summary = content[0]?.matches("p") ? content.shift() : null;
+    if (summary) { summary.classList.add("section-summary"); card.append(summary); }
+    const taskLists = content.filter(el => el.matches("ul, ol") && el.querySelector('li.item:not([data-status="none"])'));
+    const tasks = content.filter((el, index) => taskLists.includes(el) || (el.matches(".section-head") && taskLists.includes(content[index + 1])));
+    const details = content.filter(el => !tasks.includes(el));
+    for (const [kind, elements, label] of [["details", details, "Solution details"], ["tasks", tasks, "Tasks"]]) {
+      if (!elements.length) continue;
+      const group = document.createElement("details");
+      group.className = "section-disclosure";
+      group.dataset.kind = kind;
+      group.dataset.owner = id;
+      const heading = document.createElement("summary");
+      heading.textContent = label;
+      const body = document.createElement("div");
+      body.className = "disclosure-body";
+      body.append(...elements);
+      group.append(heading, body);
+      group.open = (kind === "tasks" ? taskExpanded : expanded).has(id);
+      group.addEventListener("toggle", () => {
+        const ids = kind === "tasks" ? taskExpanded : expanded;
+        if (group.open) ids.add(id); else ids.delete(id);
+        saveJson(kind === "tasks" ? "sectionTasks" : "sectionDetails", [...ids]);
+        updateOutlineControls();
+        renderRuler();
+      });
+      card.append(group);
+    }
+    const thoughts = document.createElement("button");
+    thoughts.type = "button";
+    thoughts.className = "section-thoughts";
+    thoughts.dataset.thoughts = id;
+    card.append(thoughts);
+  }
+  for (const el of nodes) {
+    if (el.matches(".section-head") && Number(el.dataset.level) === 2) {
+      finish();
+      card = document.createElement("section");
+      card.className = "plan-section";
+      card.dataset.outline = el.dataset.section;
+      el.before(card);
+      card.append(el);
+      content = [];
+    } else if (card) content.push(el);
+  }
+  finish();
 }
 
-// Everything under a heading up to the next heading of the same or a higher level.
-function sectionRange(h) {
-  const level = sectionLevel(h);
-  const els = [];
-  let el = h.nextElementSibling;
-  while (el && !(el.classList.contains("section-head") && sectionLevel(el) <= level)) {
-    els.push(el);
-    el = el.nextElementSibling;
-  }
-  return els;
+function updateOutlineControls() {
+  const groups = [...boardEl.querySelectorAll(".section-disclosure")];
+  toolbarEl.hidden = !groups.length;
+  collapseBtn.textContent = groups.length && groups.every(el => el.open) ? "Collapse all" : "Expand all";
+  collapseBtn.dataset.mode = groups.every(el => el.open) ? "collapse" : "expand";
 }
 
 function applyCollapse() {
-  const filtering = anyFilter();
-  for (const el of boardEl.querySelectorAll(".sec-hidden")) el.classList.remove("sec-hidden");
-  let anyComplete = false;
-  let anyCollapsed = false;
-  for (const h of boardEl.querySelectorAll(".section-head")) {
-    const complete = h.classList.contains("sec-complete");
-    h.classList.remove("collapsed");
-    if (!complete) continue;
-    anyComplete = true;
-    const collapsed = !filtering && !expanded.has(h.dataset.section);
-    const toggle = document.createElement("button");
-    toggle.type = "button";
-    toggle.className = "deco sec-toggle";
-    toggle.dataset.toggleSection = h.dataset.section;
-    toggle.title = collapsed ? "Show this finished section" : "Collapse this finished section";
-    toggle.setAttribute("aria-expanded", String(!collapsed));
-    h.insertBefore(toggle, h.firstChild);
-    if (!collapsed) continue;
-    anyCollapsed = true;
-    h.classList.add("collapsed");
-    const range = sectionRange(h);
-    let n = 0;
-    for (const el of range) {
-      el.classList.add("sec-hidden");
-      n += el.matches("ul, ol") ? el.querySelectorAll('li.item:not([data-status="none"])').length : 0;
-    }
-    const more = document.createElement("span");
-    more.className = "deco sec-more";
-    more.textContent = `${n} done item${n === 1 ? "" : "s"} folded`;
-    h.appendChild(more);
+  $("#contentsLinks").innerHTML = numberedSections(state.sections || []).map(section => {
+    const id = section.id;
+    const thread = state.threads?.[`section:${id}`];
+    const counts = section?.counts;
+    const active = selection.type === "section" && selection.section === id;
+    return `<button type="button" class="contents-link${active ? " active" : ""}" data-jump-section="${esc(id)}" style="--indent:${section.depth}" ${active ? 'aria-current="location"' : ''}><span>${section.number ? `<span class="contents-number">${section.number}</span> ` : ""}${esc(section.displayTitle)}</span><small>${counts?.total ? `${counts.done}/${counts.total}` : ""}${thread ? ` · ${thread.count} thought${thread.count === 1 ? "" : "s"}${thread.last_from === "agent" ? " · reply" : ""}` : ""}</small></button>`;
+  }).join("");
+  for (const button of boardEl.querySelectorAll("[data-thoughts]")) {
+    const thread = state.threads?.[`section:${button.dataset.thoughts}`];
+    button.textContent = thread ? `${thread.count} thought${thread.count === 1 ? "" : "s"}${thread.last_from === "agent" ? " · Agent replied" : ""}` : "Discuss this section";
   }
-  collapseBtn.hidden = !anyComplete;
-  collapseBtn.textContent = anyCollapsed ? "Expand done" : "Collapse done";
-  collapseBtn.dataset.mode = anyCollapsed ? "expand" : "collapse";
+  for (const group of boardEl.querySelectorAll('.section-disclosure[data-kind="tasks"]')) {
+    const items = [...group.querySelectorAll('li.item:not([data-status="none"])')];
+    group.querySelector("summary").textContent = `Tasks · ${items.filter(el => el.dataset.status === "done").length}/${items.length} done`;
+  }
+  updateOutlineControls();
 }
 
-function toggleSection(id) {
-  if (expanded.has(id)) expanded.delete(id);
-  else expanded.add(id);
-  saveJson("expanded", [...expanded]);
-  paint();
-}
-
-collapseBtn.addEventListener("click", () => {
-  if (collapseBtn.dataset.mode === "expand") {
-    for (const h of boardEl.querySelectorAll(".section-head.sec-complete")) expanded.add(h.dataset.section);
-  } else expanded.clear();
-  saveJson("expanded", [...expanded]);
-  paint();
+boardEl.addEventListener("click", ev => {
+  const summary = ev.target.closest(".section-disclosure > summary");
+  if (!summary) return;
+  const group = summary.parentElement;
+  if (!group.open && group.dataset.kind === "details") {
+    for (const other of boardEl.querySelectorAll('.section-disclosure[data-kind="details"]')) {
+      if (other !== group) other.open = false;
+    }
+  }
 });
 
-// ---- filters ------------------------------------------------------------------
+$("#contentsLinks").addEventListener("click", ev => {
+  const button = ev.target.closest("[data-jump-section]");
+  if (!button) return;
+  select({ type: "section", section: button.dataset.jumpSection }, { focus: false, scrollTo: true });
+});
 
-function applyFilters() {
-  const any = anyFilter();
-  boardEl.classList.toggle("filtering", any);
-  for (const b of toolbarEl.querySelectorAll(".filter")) b.classList.toggle("active", Boolean(filters[b.dataset.filter]));
-  for (const el of boardEl.querySelectorAll(".filtered-out, .sec-empty")) el.classList.remove("filtered-out", "sec-empty");
-  const items = [...boardEl.querySelectorAll('li.item:not([data-status="none"])')];
-  let visible = 0;
-  if (any) {
-    // children first, so a parent stays when one of its sub-items matches
-    for (const li of [...items].reverse()) {
-      const st = li.dataset.status;
-      let match = true;
-      if (filters.open && (st === "done" || st === "dropped")) match = false;
-      if (filters.changed && !li.classList.contains("changed")) match = false;
-      if (filters.notes && !li.classList.contains("has-notes")) match = false;
-      const childVisible = li.querySelector("li.item:not(.filtered-out)") !== null && [...li.querySelectorAll("li.item")].some((c) => !c.classList.contains("filtered-out"));
-      if (!match && !childVisible) li.classList.add("filtered-out");
-    }
-    for (const fig of boardEl.querySelectorAll("figure.diagram")) {
-      const keep = (filters.changed && fig.classList.contains("changed")) || (filters.notes && fig.classList.contains("has-notes"));
-      if (!keep) fig.classList.add("filtered-out");
-    }
-    for (const el of boardEl.querySelectorAll(".plan > p.block, .plan > blockquote.block, .plan > table.block, .plan > pre")) {
-      const keep = filters.notes && el.querySelector(".img-wrap.has-notes");
-      if (!keep) el.classList.add("filtered-out");
-    }
-    for (const h of boardEl.querySelectorAll(".section-head")) {
-      const range = sectionRange(h);
-      const has = range.some((el) => (el.matches("ul, ol") && el.querySelector("li.item:not(.filtered-out)")) || (el.matches("figure.diagram, p.block") && !el.classList.contains("filtered-out")) || (el.classList.contains("section-head") && !el.classList.contains("sec-empty")));
-      if (!has) h.classList.add("sec-empty");
-    }
-  }
-  for (const li of items) if (!li.classList.contains("filtered-out") && li.getClientRects().length) visible++;
-  filterCountEl.textContent = any ? `${visible} of ${items.length} items` : "";
-  filterCountEl.hidden = !any;
-}
-
-function toggleFilter(name) {
-  filters = { ...filters, [name]: !filters[name] };
-  saveJson("filters", filters);
-  paint();
-}
-toolbarEl.addEventListener("click", (ev) => {
-  const b = ev.target.closest(".filter");
-  if (b) toggleFilter(b.dataset.filter);
+collapseBtn.addEventListener("click", () => {
+  const open = collapseBtn.dataset.mode === "expand";
+  for (const group of boardEl.querySelectorAll(".section-disclosure")) group.open = open;
+  updateOutlineControls();
+  renderRuler();
 });
 
 // ---- ruler: where the changes and notes are along the whole plan -----------------------
@@ -526,6 +512,7 @@ function updateRulerViewport() {
 }
 boardEl.addEventListener("scroll", () => requestAnimationFrame(updateRulerViewport), { passive: true });
 window.addEventListener("resize", () => requestAnimationFrame(renderRuler));
+setupPanelResize($("#layout"), { load: loadJson, save: saveJson, onResize: () => requestAnimationFrame(renderRuler) });
 window.matchMedia("(max-width: 900px)").addEventListener("change", () => {
   renderTopbar();
   if (!isPhone()) openSheet(false);
@@ -589,13 +576,9 @@ function select(anchor, { focus = true, scrollTo = false } = {}) {
 function revealAnchor(a) {
   const el = elementForAnchor(a);
   if (!el) return;
-  let top = el;
-  while (top && top.parentElement && !top.parentElement.classList.contains("plan")) top = top.parentElement;
-  if (!top || !top.classList.contains("sec-hidden")) return;
-  let h = top.previousElementSibling;
-  while (h && !h.classList.contains("section-head")) h = h.previousElementSibling;
-  if (h && h.classList.contains("sec-complete")) expanded.add(h.dataset.section);
-  saveJson("expanded", [...expanded]);
+  for (let parent = el.parentElement; parent && parent !== boardEl; parent = parent.parentElement) {
+    if (parent.matches("details.section-disclosure")) parent.open = true;
+  }
 }
 
 function elementForAnchor(a) {
@@ -643,11 +626,11 @@ function anchorFromKey(key) {
 boardEl.addEventListener("click", (ev) => {
   const t = ev.target;
   if (!(t instanceof Element)) return;
-  const toggleSec = t.closest("[data-toggle-section]");
-  if (toggleSec) {
-    ev.preventDefault();
-    ev.stopPropagation();
-    toggleSection(toggleSec.dataset.toggleSection);
+  if (t.closest(".section-disclosure > summary")) return;
+  const thoughts = t.closest("[data-thoughts]");
+  if (thoughts) {
+    select({ type: "section", section: thoughts.dataset.thoughts });
+    setTab("thread");
     return;
   }
   const beforeBtn = t.closest(".toggle-before");
@@ -786,7 +769,7 @@ function toggleBefore(did) {
 // ---------------------------------------------------------------- keyboard
 
 function visibleItems() {
-  return [...boardEl.querySelectorAll('li.item:not([data-status="none"])')].filter((el) => !el.classList.contains("filtered-out") && el.getClientRects().length);
+  return [...boardEl.querySelectorAll('li.item:not([data-status="none"])')].filter((el) => el.getClientRects().length);
 }
 
 function moveItem(delta) {
@@ -840,15 +823,6 @@ document.addEventListener("keydown", (ev) => {
     case "p":
       ev.preventDefault();
       reviewStep(-1);
-      break;
-    case "o":
-      toggleFilter("open");
-      break;
-    case "c":
-      toggleFilter("changed");
-      break;
-    case "t":
-      toggleFilter("notes");
       break;
     case "1":
       setTab("thread");
@@ -911,8 +885,8 @@ function renderContext() {
   const a = selection;
   const parts = [];
   const isBoard = !a || a.type === "board";
-  parts.push(`<div class="ctx-row"><span class="ctx-kind">${esc(kindLabel(a))}</span>${isBoard ? "" : `<button type="button" class="ctx-clear" id="ctxClear" title="Back to the whole plan (Esc)">×</button>`}</div>`);
-  parts.push(`<div class="ctx-label" title="${esc(selectionLabel)}">${esc(selectionLabel)}</div>`);
+  parts.push(`<div class="ctx-row"><span class="ctx-kind">${esc(kindLabel(a))}</span>${isBoard ? "" : `<button type="button" class="ctx-clear" id="ctxClear" title="Back to the plan (Esc)">×</button>`}</div>`);
+  if (!isBoard) parts.push(`<div class="ctx-label" title="${esc(selectionLabel)}">${esc(selectionLabel)}</div>`);
   if (a.type === "item" || (a.type === "text" && a.item)) {
     const it = itemById(a.item);
     if (it) {
@@ -943,7 +917,7 @@ function renderContext() {
     }
   });
   panelContext.querySelector(".wb-btn")?.addEventListener("click", (ev) => openWhiteboard(ev.currentTarget.dataset.diagram));
-  composerText.placeholder = isBoard ? "Note on the whole plan… (Enter adds, ⌘/Ctrl+Enter adds and sends)" : `Note on: ${selectionLabel}`;
+  composerText.placeholder = isBoard ? "Note on the plan… (Enter adds, ⌘/Ctrl+Enter adds and sends)" : `Note on: ${selectionLabel}`;
 }
 
 function kindLabel(a) {
@@ -988,7 +962,7 @@ function noteBubble(n, { showAnchor = false } = {}) {
   const depthTag = mine && n.depth && n.depth !== "normal" ? `<span class="depth-tag ${esc(n.depth)}" title="You asked for a ${esc(n.depth)} answer">${esc(n.depth)}</span>` : "";
   const kindTag = n.kind === "sketch" ? `<span class="kind-tag" title="Drawn on the whiteboard">✎ sketch</span>` : "";
   const anchorChip = showAnchor && anchorKeyOf(n.anchor) !== "board" ? `<button type="button" class="anchor-chip" data-anchor='${esc(JSON.stringify(n.anchor))}'>${esc(n.label || labelFor(n.anchor))}</button>` : "";
-  const body = n.text ? (mine ? `<div class="bubble-text">${esc(n.text).replace(/\n/g, "<br>")}</div>` : `<div class="bubble-text md">${n.html || esc(n.text)}</div>`) : "";
+  const body = n.text ? `<div class="bubble-text md">${n.html || esc(n.text).replace(/\n/g, "<br>")}</div>` : "";
   const quoteText = mine ? n.quote || (n.anchor && n.anchor.type === "text" ? n.anchor.quote : "") : "";
   const quote = quoteText ? `<blockquote class="bubble-quote">${esc(quoteText)}</blockquote>` : "";
   return `<div class="bubble ${mine ? "mine" : "agent"} state-${esc(n.state)}${n.kind === "sketch" ? " sketch" : ""}" data-note="${esc(n.id)}">
@@ -1001,7 +975,7 @@ function renderThread() {
   const key = anchorKeyOf(selection);
   const notes = (state.notes || []).filter((n) => anchorKeyOf(n.anchor) === key);
   if (!notes.length) {
-    panelScroll.innerHTML = `<div class="empty">${key === "board" ? "No notes on the whole plan yet. Click an item, heading, diagram node or image on the board to talk about it, or write here for the plan as a whole." : "Nothing said about this yet. Write the first note below."}</div>`;
+    panelScroll.innerHTML = `<div class="empty">${key === "board" ? "No notes on the plan yet. Click an item, heading, diagram node or image on the board to talk about it, or write here to discuss the plan." : "Nothing said about this yet. Write the first note below."}</div>`;
     return;
   }
   panelScroll.innerHTML = notes.map((n) => noteBubble(n)).join("");
@@ -1101,19 +1075,6 @@ panelScroll.addEventListener("click", async (ev) => {
 
 // ---------------------------------------------------------------- composer
 
-depthEl.addEventListener("click", (ev) => {
-  const b = ev.target.closest("[data-depth]");
-  if (!b) return;
-  depth = b.dataset.depth;
-  for (const x of depthEl.querySelectorAll("[data-depth]")) x.classList.toggle("active", x === b);
-  composerText.focus();
-});
-
-function setDepth(d) {
-  depth = d;
-  for (const x of depthEl.querySelectorAll("[data-depth]")) x.classList.toggle("active", x.dataset.depth === d);
-}
-
 function renderAttachStrip() {
   attachStrip.hidden = !pendingFiles.length;
   attachStrip.innerHTML = pendingFiles
@@ -1189,12 +1150,11 @@ async function addNote({ send = false } = {}) {
   addBtn.disabled = true;
   try {
     const quote = selection.type === "text" ? selection.quote : undefined;
-    await api("POST", "/notes", { anchor: selection, text, quote, depth, attachments: pendingFiles.map((f) => f.file) });
+    await api("POST", "/notes", { anchor: selection, text, quote, attachments: pendingFiles.map((f) => f.file) });
     composerText.value = "";
     tempPin = null;
     pendingFiles = [];
     renderAttachStrip();
-    setDepth("normal");
     await refreshState();
     renderPanel();
     paint();
@@ -1252,7 +1212,7 @@ function renderTopbar() {
   if (n) {
     changesChip.hidden = false;
     const long = sinceBasis === "visit" && since ? `${n} change${n === 1 ? "" : "s"} since your last visit (${ago(since)})` : `${n} change${n === 1 ? "" : "s"} since you opened the board`;
-    changesChip.textContent = isPhone() ? `${n} change${n === 1 ? "" : "s"}` : long;
+    changesChip.textContent = `${n} change${n === 1 ? "" : "s"}`;
     changesChip.title = long;
   } else changesChip.hidden = true;
   renderPresence();
@@ -1436,8 +1396,52 @@ setInterval(() => {
 
 // ---------------------------------------------------------------- boot
 
+function followHash() {
+  const anchor = anchorForHash(location.hash, state);
+  if (!anchor) return;
+  select(anchor, { focus: false, scrollTo: true });
+}
+document.addEventListener("click", event => {
+  if (event.defaultPrevented || event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
+  const link = event.target instanceof Element ? event.target.closest("a[href]") : null;
+  if (!link || link.hasAttribute("download") || (link.target && link.target !== "_self")) return;
+  const hash = samePageHash(link.getAttribute("href"), location.href);
+  if (!hash || !anchorForHash(hash, state)) return;
+  event.preventDefault();
+  event.stopPropagation();
+  if (location.hash !== hash) history.pushState(null, "", hash);
+  followHash();
+}, true);
+window.addEventListener("hashchange", followHash);
+window.addEventListener("popstate", followHash);
+
+const themeToggle = $("#themeToggle");
+function updateThemeToggle() {
+  const dark = document.documentElement.dataset.theme === "dark";
+  themeToggle.textContent = dark ? "☀ Light" : "☾ Dark";
+  themeToggle.setAttribute("aria-label", `Switch to ${dark ? "light" : "dark"} theme`);
+  themeToggle.title = `Switch to ${dark ? "light" : "dark"} theme`;
+}
+themeToggle.addEventListener("click", () => {
+  const theme = document.documentElement.dataset.theme === "dark" ? "light" : "dark";
+  document.documentElement.dataset.theme = theme;
+  try { localStorage.setItem("pb:theme", theme); } catch {}
+  updateThemeToggle();
+  renderDiagrams();
+});
+window.matchMedia("(prefers-color-scheme: dark)").addEventListener("change", event => {
+  let saved;
+  try { saved = localStorage.getItem("pb:theme"); } catch {}
+  if (saved === "light" || saved === "dark") return;
+  document.documentElement.dataset.theme = event.matches ? "dark" : "light";
+  updateThemeToggle();
+  renderDiagrams();
+});
+updateThemeToggle();
+
 renderBoard();
 renderTopbar();
 renderPanel();
+followHash();
 connect();
 touchVisit();
