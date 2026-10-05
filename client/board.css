@@ -932,9 +932,11 @@ figure.diagram g.cluster.has-notes > rect {
 }
 
 /* ---------- home ---------- */
+/* Keep the sun/moon in frame when the landscape is cropped to a narrow viewport. */
+body.home { background-position: 10.5% top; }
 body.home .home-main {
   width: min(820px, calc(100% - 36px));
-  margin: 32px auto;
+  margin: clamp(128px, 18vh, 220px) auto 32px;
   padding: 24px;
   background: var(--workspace-glass, var(--paper));
   border: 1px solid var(--line);
@@ -1001,7 +1003,7 @@ body.home h1 { margin: 0 0 20px; font-size: 28px; font-weight: 600; letter-spaci
   background: var(--progress);
 }
 @media (max-width: 600px) {
-  body.home .home-main { width: calc(100% - 24px); margin: 18px auto; padding: 18px; }
+  body.home .home-main { width: calc(100% - 24px); padding: 18px; }
   .board-row { gap: 10px; padding: 12px; }
   .board-progress .bar { display: none; }
 }
