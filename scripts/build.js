@@ -23,8 +23,11 @@ const options = {
   define: { "process.env.NODE_ENV": '"production"' },
 };
 
-function copyCss() {
-  fs.copyFileSync(path.join(root, "client", "board.css"), path.join(outDir, "board.css"));
+const staticFiles = ["board.css", "whiteboard.css", "theme.js"];
+function copyStatic() {
+  for (const name of staticFiles) {
+    fs.copyFileSync(path.join(root, "client", name), path.join(outDir, name));
+  }
   fs.cpSync(path.join(root, "client", "assets"), path.join(outDir, "assets"), { recursive: true });
 }
 
@@ -49,12 +52,12 @@ function copyWhiteboard() {
 if (watch) {
   const ctx = await esbuild.context(options);
   await ctx.watch();
-  copyCss();
-  fs.watch(path.join(root, "client", "board.css"), copyCss);
+  copyStatic();
+  for (const name of staticFiles) fs.watch(path.join(root, "client", name), copyStatic);
   console.log("watching client/ …");
 } else {
   await esbuild.build(options);
-  copyCss();
+  copyStatic();
   copyWhiteboard();
   const size = fs.statSync(options.outfile).size;
   console.log(`built ${path.relative(root, options.outfile)} (${(size / 1024 / 1024).toFixed(1)} MB)`);
