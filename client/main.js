@@ -1415,29 +1415,7 @@ document.addEventListener("click", event => {
 window.addEventListener("hashchange", followHash);
 window.addEventListener("popstate", followHash);
 
-const themeToggle = $("#themeToggle");
-function updateThemeToggle() {
-  const dark = document.documentElement.dataset.theme === "dark";
-  themeToggle.textContent = dark ? "☀ Light" : "☾ Dark";
-  themeToggle.setAttribute("aria-label", `Switch to ${dark ? "light" : "dark"} theme`);
-  themeToggle.title = `Switch to ${dark ? "light" : "dark"} theme`;
-}
-themeToggle.addEventListener("click", () => {
-  const theme = document.documentElement.dataset.theme === "dark" ? "light" : "dark";
-  document.documentElement.dataset.theme = theme;
-  try { localStorage.setItem("pb:theme", theme); } catch {}
-  updateThemeToggle();
-  renderDiagrams();
-});
-window.matchMedia("(prefers-color-scheme: dark)").addEventListener("change", event => {
-  let saved;
-  try { saved = localStorage.getItem("pb:theme"); } catch {}
-  if (saved === "light" || saved === "dark") return;
-  document.documentElement.dataset.theme = event.matches ? "dark" : "light";
-  updateThemeToggle();
-  renderDiagrams();
-});
-updateThemeToggle();
+window.addEventListener("planboard:themechange", () => renderDiagrams());
 
 renderBoard();
 renderTopbar();

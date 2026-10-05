@@ -14,7 +14,7 @@ export function createWhiteboardHost({ overlay, frame, titleEl, errorEl, closeBt
   let current = null; // { diagramId, source, sourceHash, channelId, ready }
   let closing = null;
 
-  const theme = () => (window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light");
+  const theme = () => document.documentElement.dataset.theme === "dark" ? "dark" : "light";
 
   function post(message) {
     if (!current || !frame.contentWindow) return;

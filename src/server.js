@@ -562,6 +562,7 @@ function renderWhiteboardFrame() {
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>planboard whiteboard</title>
 <link rel="stylesheet" href="/whiteboard-assets/whiteboard.css">
+<link rel="stylesheet" href="/client/whiteboard.css">
 </head>
 <body>
 <script>window.__lavishWhiteboardChannelToken="planboard";</script>
@@ -579,7 +580,26 @@ function renderHome(boards, version) {
       return `<li class="board-row"><a href="${escapeHtml(s.url)}"><span class="board-title">${escapeHtml(s.title)}</span><span class="board-path">${escapeHtml(s.path)}</span></a><span class="board-progress"><span class="bar"><i style="width:${pct}%"></i></span>${c.done}/${c.total}</span><span class="presence presence-${escapeHtml(s.presence)}" title="agent ${escapeHtml(s.presence)}"></span></li>`;
     })
     .join("\n");
-  return `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>planboard</title><link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 viewBox=%270 0 32 32%27%3E%3Crect width=%2732%27 height=%2732%27 rx=%277%27 fill=%27%232456d6%27/%3E%3Cpath d=%27M9 16.5l4.5 4.5L23 12%27 fill=%27none%27 stroke=%27%23fff%27 stroke-width=%273.2%27 stroke-linecap=%27round%27 stroke-linejoin=%27round%27/%3E%3C/svg%3E"><link rel="stylesheet" href="/client/board.css"></head><body class="home"><header class="topbar"><div class="brand">planboard</div><div class="muted">${escapeHtml(version)}</div></header><main class="home-main"><h1>Boards</h1>${rows ? `<ul class="board-list">${rows}</ul>` : `<p class="muted">No boards yet. Run <code>planboard PLAN.md</code> in a project.</p>`}</main></body></html>`;
+  return `<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>planboard</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 viewBox=%270 0 32 32%27%3E%3Crect width=%2732%27 height=%2732%27 rx=%277%27 fill=%27%232456d6%27/%3E%3Cpath d=%27M9 16.5l4.5 4.5L23 12%27 fill=%27none%27 stroke=%27%23fff%27 stroke-width=%273.2%27 stroke-linecap=%27round%27 stroke-linejoin=%27round%27/%3E%3C/svg%3E">
+<script src="/client/theme.js"></script>
+<link rel="stylesheet" href="/client/board.css">
+</head>
+<body class="home">
+<header class="topbar">
+  <div class="brand">planboard</div>
+  <div class="muted">${escapeHtml(version)}</div>
+  <div class="spacer"></div>
+  <button type="button" class="top-link theme-toggle" id="themeToggle">Dark</button>
+</header>
+<main class="home-main"><h1>Boards</h1>${rows ? `<ul class="board-list">${rows}</ul>` : `<p class="muted">No boards yet. Run <code>planboard PLAN.md</code> in a project.</p>`}</main>
+</body>
+</html>`;
 }
 
 function renderBoardPage(board) {
@@ -592,9 +612,9 @@ function renderBoardPage(board) {
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>${escapeHtml(state.title)} · planboard</title>
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 viewBox=%270 0 32 32%27%3E%3Crect width=%2732%27 height=%2732%27 rx=%277%27 fill=%27%232456d6%27/%3E%3Cpath d=%27M9 16.5l4.5 4.5L23 12%27 fill=%27none%27 stroke=%27%23fff%27 stroke-width=%273.2%27 stroke-linecap=%27round%27 stroke-linejoin=%27round%27/%3E%3C/svg%3E">
+<script src="/client/theme.js"></script>
 <link rel="stylesheet" href="/client/board.css">
 <script id="planboard-state" type="application/json">${json}</script>
-<script>try { const t = localStorage.getItem("pb:theme"); document.documentElement.dataset.theme = t === "light" || t === "dark" ? t : matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light"; } catch { document.documentElement.dataset.theme = matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light"; }</script>
 </head>
 <body>
 <header class="topbar" id="topbar">

@@ -1,0 +1,153 @@
+/* Planboard overrides for the bundled whiteboard frame. */
+body {
+  --pb-wb-bg: #edf3f8;
+  --pb-wb-paper: #ffffff;
+  --pb-wb-ink: #172c3f;
+  --pb-wb-muted: #4c6378;
+  --pb-wb-line: #cedbe5;
+  --pb-wb-soft: #e7f0ff;
+  --pb-wb-action: #1759b7;
+  --pb-wb-action-hover: #124995;
+  --pb-wb-action-text: #ffffff;
+  --pb-wb-done: #217747;
+  background: var(--pb-wb-paper);
+  color: var(--pb-wb-ink);
+  color-scheme: light;
+}
+
+body[data-lavish-whiteboard-theme="dark"] {
+  --pb-wb-bg: #0d1725;
+  --pb-wb-paper: #142131;
+  --pb-wb-ink: #edf5ff;
+  --pb-wb-muted: #b0c2d5;
+  --pb-wb-line: #34485e;
+  --pb-wb-soft: #203c59;
+  --pb-wb-action: #8ebfff;
+  --pb-wb-action-hover: #b1d3ff;
+  --pb-wb-action-text: #0d1725;
+  --pb-wb-done: #76d9a4;
+  background: var(--pb-wb-paper);
+  color: var(--pb-wb-ink);
+  color-scheme: dark;
+}
+
+#wbHeader {
+  background: var(--pb-wb-paper);
+  border-color: var(--pb-wb-line);
+}
+
+#wbNote {
+  background: var(--pb-wb-bg);
+  border-color: var(--pb-wb-line);
+}
+
+#wbNote::placeholder { color: var(--pb-wb-muted); }
+
+#wbHeader button,
+#wbLinkConfirmOpen {
+  background: var(--pb-wb-action);
+  color: var(--pb-wb-action-text);
+}
+
+#wbHeader button:hover:not(:disabled),
+#wbLinkConfirmOpen:hover:not(:disabled) {
+  background: var(--pb-wb-action-hover);
+}
+
+#wbHeader button:focus-visible,
+#wbNote:focus-visible,
+.wb-link-confirm-actions button:focus-visible,
+.wb-banner button:focus-visible {
+  outline: 2px solid var(--pb-wb-action);
+  outline-offset: 2px;
+}
+
+.wb-banner,
+.wb-banner-warn {
+  background: var(--pb-wb-soft);
+  color: var(--pb-wb-ink);
+  border-color: var(--pb-wb-line);
+}
+
+.wb-banner-warn { border-left: 3px solid var(--pb-wb-action); }
+.wb-banner button,
+.wb-link-confirm-actions button,
+#wbHeader #wbFullscreen { border-color: var(--pb-wb-line); }
+#wbHeader #wbFullscreen {
+  background: var(--pb-wb-paper);
+  color: var(--pb-wb-ink);
+}
+.wb-banner button:hover,
+.wb-link-confirm-actions button:hover,
+body #wbHeader #wbFullscreen:hover { background: var(--pb-wb-soft); }
+
+.wb-status {
+  background: color-mix(in srgb, var(--pb-wb-done) 12%, var(--pb-wb-paper));
+  color: var(--pb-wb-ink);
+  border-color: color-mix(in srgb, var(--pb-wb-done) 40%, var(--pb-wb-line));
+}
+
+.wb-link-confirm { background: rgb(13 23 37 / 45%); }
+#wbLinkConfirm .wb-link-confirm-card {
+  background: var(--pb-wb-paper);
+  color: var(--pb-wb-ink);
+  border-color: var(--pb-wb-line);
+  box-shadow: 0 16px 42px rgb(13 23 37 / 25%);
+}
+.wb-link-confirm-url { background: var(--pb-wb-bg); }
+.wb-activate-label {
+  background: var(--pb-wb-soft);
+  color: var(--pb-wb-action);
+  border-color: var(--pb-wb-line);
+}
+
+/* Skin the editor controls; preserve the colors chosen for drawing elements. */
+.excalidraw,
+.excalidraw.theme--dark {
+  --color-primary: var(--pb-wb-action);
+  --color-primary-darker: var(--pb-wb-action-hover);
+  --color-primary-darkest: var(--pb-wb-action-hover);
+  --color-primary-hover: var(--pb-wb-action-hover);
+  --color-primary-light: var(--pb-wb-soft);
+  --color-primary-light-darker: var(--pb-wb-soft);
+  --color-selection: var(--pb-wb-action);
+  --color-brand-hover: var(--pb-wb-action-hover);
+  --color-brand-active: var(--pb-wb-action);
+  --color-surface-primary-container: var(--pb-wb-soft);
+  --color-on-primary-container: var(--pb-wb-action);
+  --color-surface-high: var(--pb-wb-soft);
+  --color-surface-mid: var(--pb-wb-bg);
+  --color-surface-low: var(--pb-wb-bg);
+  --color-surface-lowest: var(--pb-wb-paper);
+  --color-on-surface: var(--pb-wb-ink);
+  --color-icon-white: var(--pb-wb-action-text);
+  --color-border-outline: var(--pb-wb-muted);
+  --color-border-outline-variant: var(--pb-wb-line);
+  --color-logo-text: var(--pb-wb-ink);
+  --color-slider-track: var(--pb-wb-soft);
+  --color-warning: var(--pb-wb-soft);
+  --color-warning-dark: var(--pb-wb-line);
+  --color-warning-darker: var(--pb-wb-action);
+  --color-warning-darkest: var(--pb-wb-action-hover);
+  --color-text-warning: var(--pb-wb-ink);
+  --color-warning-color: var(--pb-wb-ink);
+  --color-warning-icon-color: var(--pb-wb-ink);
+  --button-gray-1: var(--pb-wb-bg);
+  --button-gray-2: var(--pb-wb-soft);
+  --button-gray-3: var(--pb-wb-line);
+  --focus-highlight-color: var(--pb-wb-action);
+  --default-bg-color: var(--pb-wb-paper);
+  --input-bg-color: var(--pb-wb-bg);
+  --input-border-color: var(--pb-wb-line);
+  --input-hover-bg-color: var(--pb-wb-soft);
+  --input-label-color: var(--pb-wb-muted);
+  --island-bg-color: var(--pb-wb-paper);
+  --keybinding-color: var(--pb-wb-muted);
+  --link-color: var(--pb-wb-action);
+  --popup-secondary-bg-color: var(--pb-wb-bg);
+  --popup-text-color: var(--pb-wb-ink);
+  --popup-text-inverted-color: var(--pb-wb-paper);
+  --select-highlight-color: var(--pb-wb-action);
+  --scrollbar-thumb: var(--pb-wb-line);
+  --scrollbar-thumb-hover: var(--pb-wb-muted);
+}

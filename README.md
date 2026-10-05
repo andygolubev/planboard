@@ -114,7 +114,7 @@ board re-renders live                planboard reply PLAN.md --to <note-id> "…
 read the reply next to the item      planboard poll PLAN.md …
 ```
 
-- **Board** (left): the plan. Green check = done, half amber = in progress, red `!` = blocked,
+- **Board** (left): the plan. Green check = done, half blue = in progress, red `!` = blocked,
   purple `?` = needs your decision. Section headers carry a stacked progress bar. The **Contents** sidebar jumps to sections
   and shows progress and section discussion counts. Contents numbers follow the
   Markdown heading order automatically: `1`, `1.1`, `1.1.1`. The document title
@@ -157,7 +157,7 @@ The **Changes** tab is drawn, not listed, so a morning catch-up is a glance:
   items faint;
 - a **timeline** of when the changes happened;
 - **per-section deltas**: done count then → now, newly done items highlighted, started items in
-  amber;
+  blue;
 - one **card per changed element**, in plan order: status pills with arrows, `added` / `removed`
   tags, a word diff for rewordings, and for diagrams a **Show before** switch that redraws the
   previous version of the diagram on the board itself;
