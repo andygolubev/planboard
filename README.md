@@ -184,6 +184,9 @@ edits into a note on the diagram: a list of what you added, removed, moved or re
 the sketch and the `.excalidraw` scene, stored in `PLAN.board/attachments/`. You send it like any
 other note; the agent reads the summary, looks at the picture, and changes the Mermaid source.
 The working scene autosaves per diagram, so re-opening continues where you left off.
+Imported connectors keep Mermaid's routed segments without sketch smoothing, and
+filled nodes sit above connectors so lines cannot obscure their labels. Older saved
+scenes receive the same correction for untouched elements; your edits are preserved.
 
 The agent's command contract is `planboard --help`. Installed skills point there and add
 guidance for their host's polling tools.
