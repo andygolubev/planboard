@@ -164,6 +164,17 @@ The **Changes** tab is drawn, not listed, so a morning catch-up is a glance:
 - a **walk-through** (‹ › or `n`/`p`) that steps through the changes, highlighting each on the
   board.
 
+### Diagram viewer
+
+Use **View** beneath a Mermaid diagram (or **View diagram** in its discussion panel) to
+open a read-only viewer in the board's theme. Zoom with **+ / −**, choose **Fit** or
+**100%**, and drag or scroll to move around. Press **Esc** to return to the plan.
+
+**Copy image** copies a PNG for pasting into a message or document; **Download PNG**
+and **Download SVG** save the full diagram, independent of the current zoom. Image
+copying requires a browser with clipboard support on HTTPS or localhost; downloads
+also work when accessing a board over plain HTTP on your local network.
+
 ### Whiteboard
 
 Every Mermaid diagram has a **✎ Whiteboard** button (also in the panel when a diagram or node is
@@ -173,6 +184,9 @@ edits into a note on the diagram: a list of what you added, removed, moved or re
 the sketch and the `.excalidraw` scene, stored in `PLAN.board/attachments/`. You send it like any
 other note; the agent reads the summary, looks at the picture, and changes the Mermaid source.
 The working scene autosaves per diagram, so re-opening continues where you left off.
+Imported connectors keep Mermaid's routed segments without sketch smoothing, and
+filled nodes sit above connectors so lines cannot obscure their labels. Older saved
+scenes receive the same correction for untouched elements; your edits are preserved.
 
 The agent's command contract is `planboard --help`. Installed skills point there and add
 guidance for their host's polling tools.

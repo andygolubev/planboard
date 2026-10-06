@@ -10,6 +10,8 @@
 //   teardownReady / teardownFailed   answer to our `prepareTeardown` when closing
 // Host → frame: init, saveResult, queueResult, prepareTeardown, sourceChanged.
 
+import { migrateSavedElements } from "./whiteboard-routing.js";
+
 export function createWhiteboardHost({ overlay, frame, titleEl, errorEl, closeBtn, api, onQueued, onClosed }) {
   let current = null; // { diagramId, source, sourceHash, channelId, ready }
   let closing = null;
@@ -48,7 +50,7 @@ export function createWhiteboardHost({ overlay, frame, titleEl, errorEl, closeBt
     let saved = null;
     try {
       const r = await api("GET", `/whiteboard/${encodeURIComponent(me.diagramId)}`);
-      saved = r.whiteboard || null;
+      saved = migrateSavedElements(r.whiteboard || null);
       if (typeof r.source === "string") {
         me.source = r.source;
       }

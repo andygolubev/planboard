@@ -4,6 +4,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 
 import esbuild from "esbuild";
+import { patchWhiteboardBundle } from "./whiteboard-bundle.js";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const outDir = path.join(root, "dist", "client");
@@ -41,8 +42,10 @@ function copyWhiteboard() {
     console.log("whiteboard bundle not found (lavish-axi dev dependency missing) - skipping");
     return;
   }
+  const patched = patchWhiteboardBundle(fs.readFileSync(path.join(src, "whiteboard.js"), "utf8"));
   fs.rmSync(dest, { recursive: true, force: true });
   fs.cpSync(src, dest, { recursive: true });
+  fs.writeFileSync(path.join(dest, "whiteboard.js"), patched);
   const packageDir = path.join(root, "node_modules", "lavish-axi");
   fs.copyFileSync(path.join(packageDir, "LICENSE"), path.join(dest, "LICENSE.lavish-axi"));
   fs.copyFileSync(path.join(packageDir, "THIRD-PARTY-NOTICES.md"), path.join(dest, "THIRD-PARTY-NOTICES.lavish-axi.md"));
@@ -53,6 +56,7 @@ if (watch) {
   const ctx = await esbuild.context(options);
   await ctx.watch();
   copyStatic();
+  copyWhiteboard();
   for (const name of staticFiles) fs.watch(path.join(root, "client", name), copyStatic);
   console.log("watching client/ …");
 } else {

@@ -6,6 +6,7 @@ import mermaid from "mermaid";
 import { renderChangesPanel, changeGroups } from "./changes.js";
 import { STATUS_ORDER, ago, anchorKeyOf, clock, cssEscape, dayLabel, describeEvent as describeEv, esc, eventKey, fileSize } from "./util.js";
 import { createWhiteboardHost } from "./whiteboard.js";
+import { createDiagramViewer } from "./diagram-viewer.js";
 import { numberedSections } from "./outline.js";
 import { setupPanelResize } from "./resize.js";
 import { anchorForHash, samePageHash } from "./links.js";
@@ -335,6 +336,7 @@ function decorateBoard() {
           })
           .join(" ")}</span>`;
       }
+      if (fig.querySelector(".diagram-canvas svg")) html += `<button type="button" class="mini-btn view-diagram-btn" data-diagram="${esc(did)}" title="View, zoom, copy or download this diagram">View</button>`;
       if (state.features && state.features.whiteboard) html += `<button type="button" class="mini-btn wb-btn" data-diagram="${esc(did)}" title="Redraw this diagram on an Excalidraw whiteboard; the edits come back as a note">✎ Whiteboard</button>`;
       tools.innerHTML = html;
       if (html) cap.appendChild(tools);
@@ -639,6 +641,12 @@ boardEl.addEventListener("click", (ev) => {
     toggleBefore(beforeBtn.dataset.diagram);
     return;
   }
+  const viewBtn = t.closest(".view-diagram-btn");
+  if (viewBtn) {
+    ev.preventDefault();
+    openDiagramViewer(viewBtn.dataset.diagram);
+    return;
+  }
   const wbBtn = t.closest(".wb-btn");
   if (wbBtn) {
     ev.preventDefault();
@@ -788,6 +796,7 @@ function isTyping(el) {
 }
 
 document.addEventListener("keydown", (ev) => {
+  if (document.body.classList.contains("diagram-viewer-open")) return;
   if (isTyping(ev.target)) return;
   if (ev.metaKey || ev.ctrlKey || ev.altKey) return;
   if (document.body.classList.contains("wb-open")) {
@@ -903,8 +912,8 @@ function renderContext() {
       );
     }
   }
-  if ((a.type === "diagram" || a.type === "node") && state.features && state.features.whiteboard) {
-    parts.push(`<div class="ctx-meta"><button type="button" class="mini-btn wb-btn" data-diagram="${esc(a.diagram)}">✎ Open whiteboard</button><span class="muted">draw the change, queue it as a note</span></div>`);
+  if (a.type === "diagram" || a.type === "node") {
+    parts.push(`<div class="ctx-meta"><button type="button" class="mini-btn view-diagram-btn" data-diagram="${esc(a.diagram)}" title="View, zoom, copy or download this diagram">View diagram</button>${state.features?.whiteboard ? `<button type="button" class="mini-btn wb-btn" data-diagram="${esc(a.diagram)}">✎ Open whiteboard</button>` : ""}</div>`);
   }
   if (a.type === "text" && a.quote) parts.push(`<blockquote class="ctx-quote">${esc(a.quote)}</blockquote>`);
   panelContext.innerHTML = parts.join("");
@@ -917,6 +926,7 @@ function renderContext() {
     }
   });
   panelContext.querySelector(".wb-btn")?.addEventListener("click", (ev) => openWhiteboard(ev.currentTarget.dataset.diagram));
+  panelContext.querySelector(".view-diagram-btn")?.addEventListener("click", (ev) => openDiagramViewer(ev.currentTarget.dataset.diagram));
   composerText.placeholder = isBoard ? "Note on the plan… (Enter adds, ⌘/Ctrl+Enter adds and sends)" : `Note on: ${selectionLabel}`;
 }
 
@@ -1247,7 +1257,19 @@ function renderSheetHandle() {
   sheetBadge.className = `sheet-badge${queued ? " queued" : pending ? " pending" : ""}`;
 }
 
-// ---------------------------------------------------------------- whiteboard
+// ---------------------------------------------------------------- diagram viewer / whiteboard
+
+const diagramViewer = createDiagramViewer();
+function openDiagramViewer(diagramId) {
+  const fig = boardEl.querySelector(`figure.diagram[data-diagram="${cssEscape(diagramId)}"]`);
+  const svg = fig?.querySelector(".diagram-canvas svg");
+  if (!svg) return toast("The diagram is not ready to view. Check its rendering in the plan.");
+  try {
+    diagramViewer.open({ svg, diagramId, before: fig.classList.contains("showing-before") });
+  } catch (error) {
+    toast(error.message);
+  }
+}
 
 const wb = createWhiteboardHost({
   overlay: $("#wbOverlay"),
