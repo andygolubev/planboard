@@ -1,6 +1,6 @@
 {
   "name": "planboard",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "description": "A whiteboard for AI-agent plans: a Markdown plan rendered as a live board you can click, annotate and discuss item by item while the agent works.",
   "type": "module",
   "bin": {
