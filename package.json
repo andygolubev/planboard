@@ -20,7 +20,8 @@
     "test": "node --test test/",
     "start": "node bin/planboard.js",
     "prepare": "node scripts/build.js",
-    "screenshots": "node scripts/screenshots.js"
+    "screenshots": "node scripts/screenshots.js",
+    "test:browser": "npm run build && node scripts/workflow-browser-test.js"
   },
   "engines": {
     "node": ">=22"

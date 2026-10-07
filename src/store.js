@@ -23,7 +23,7 @@ export const MAX_ATTACHMENTS_PER_NOTE = 8;
 const ATTACHMENT_FILE_RE = /^[A-Za-z0-9][A-Za-z0-9._-]{0,120}\.(png|jpe?g|gif|webp|excalidraw)$/;
 // The sidecar lines planboard keeps out of git: one machine's viewing state and
 // the autosaved whiteboard working scenes (large, rewritten on every stroke).
-const SIDECAR_IGNORES = ["visits.json", "*.tmp", "whiteboards/"];
+const SIDECAR_IGNORES = ["visits.json", "*.tmp", "whiteboards/", "workflow/writer.lock", "workflow/writer.guard", "workflow/snapshot.json", "workflow/journal.jsonl"];
 
 export function anchorKey(anchor) {
   if (!anchor || !anchor.type || anchor.type === "board") return "board";

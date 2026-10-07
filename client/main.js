@@ -10,6 +10,7 @@ import { createDiagramViewer } from "./diagram-viewer.js";
 import { numberedSections } from "./outline.js";
 import { setupPanelResize } from "./resize.js";
 import { anchorForHash, samePageHash } from "./links.js";
+import { acceptanceBadge, createWorkflowHost, WORKFLOW_TABS } from "./workflow.js";
 
 const bootEl = document.getElementById("planboard-state");
 let state = JSON.parse(bootEl.textContent);
@@ -55,6 +56,9 @@ const review = { index: -1 };
 const beforeMode = new Set();
 const expanded = new Set(loadJson("sectionDetails", []));
 const taskExpanded = new Set(loadJson("sectionTasks", []));
+const workflow = createWorkflowHost({ api, base: API, getState: () => state, getSince: () => since, notify: (message) => toast(message), onRefresh: async () => {
+  if (await refreshState()) { paint(); renderTopbar(); renderPanel(); }
+} });
 
 function loadJson(key, fallback) {
   try {
@@ -137,9 +141,17 @@ async function api(method, path, body, { raw = false, headers = {} } = {}) {
   return json;
 }
 
+let refreshGeneration = 0;
+let renderedBoardHTML = null;
 async function refreshState() {
+  const generation = ++refreshGeneration;
   try {
-    state = await api("GET", "/state");
+    const next = await api("GET", "/state");
+    if (generation !== refreshGeneration) return false;
+    state = next;
+    // A workflow/notes refresh can supersede a simultaneous plan refresh.
+    // Render the newest plan even when that newer request has a different type.
+    if (renderedBoardHTML !== null && renderedBoardHTML !== state.html) renderBoard();
     return true;
   } catch (err) {
     console.warn("state refresh failed", err);
@@ -158,6 +170,7 @@ function renderBoard() {
     return;
   }
   boardEl.innerHTML = `<article class="plan">${state.html}</article>`;
+  renderedBoardHTML = state.html;
   boardEl.scrollTop = scroll;
   buildOutline();
   renderDiagrams();
@@ -262,6 +275,13 @@ function decorateBoard() {
     const body = li.querySelector(":scope > .item-body");
     if (!body) continue;
     const key = `item:${id}`;
+    const task = state.workflow?.tasks?.find((task) => task.id === id);
+    if (task?.managed || li.dataset.status === "done") {
+      const validation = document.createElement("span");
+      validation.className = "deco wf-inline-acceptance";
+      validation.innerHTML = acceptanceBadge(task);
+      body.insertBefore(validation, firstBlockChild(body));
+    }
     const t = threads[key];
     const evs = changes.get(key);
     if (evs) {
@@ -813,6 +833,7 @@ document.addEventListener("keydown", (ev) => {
       moveItem(-1);
       break;
     case "Enter": {
+      if (ev.target.closest?.("button, a, summary, [role=tab]")) return;
       if (selection.type === "board") return;
       ev.preventDefault();
       setTab("thread");
@@ -841,6 +862,18 @@ document.addEventListener("keydown", (ev) => {
       break;
     case "3":
       setTab("changes");
+      break;
+    case "4":
+      setTab("requirements");
+      break;
+    case "5":
+      setTab("execution");
+      break;
+    case "6":
+      setTab("validation");
+      break;
+    case "7":
+      setTab("resume");
       break;
     case "?":
       helpOverlay.hidden = !helpOverlay.hidden;
@@ -872,7 +905,7 @@ function reviewStep(delta) {
   review.index = review.index < 0 ? (delta > 0 ? 0 : groups.length - 1) : (review.index + delta + groups.length) % groups.length;
   const g = groups[review.index];
   tab = "changes";
-  for (const b of tabsEl.querySelectorAll(".tab")) b.classList.toggle("active", b.dataset.tab === "changes");
+  updateTabs();
   select(anchorFromKey(g.key), { focus: false, scrollTo: true });
   const row = panelScroll.querySelector(`.change-row[data-change-index="${review.index}"]`);
   if (row) row.scrollIntoView({ block: "nearest", behavior: "smooth" });
@@ -881,13 +914,41 @@ function reviewStep(delta) {
 // ---------------------------------------------------------------- panel
 
 function setTab(name) {
+  if (!tabsEl.querySelector(`[data-tab="${name}"]`)) return;
   tab = name;
-  for (const b of tabsEl.querySelectorAll(".tab")) b.classList.toggle("active", b.dataset.tab === name);
+  updateTabs();
+  if (isPhone()) openSheet(true);
   renderPanel();
+}
+function updateTabs() {
+  tabsEl.setAttribute("role", "tablist");
+  tabsEl.setAttribute("aria-label", "Board views");
+  panelScroll.setAttribute("role", "tabpanel");
+  panelScroll.tabIndex = 0;
+  panelScroll.setAttribute("aria-labelledby", `tab-${tab}`);
+  for (const b of tabsEl.querySelectorAll(".tab")) {
+    const active = b.dataset.tab === tab;
+    b.classList.toggle("active", active);
+    b.id = `tab-${b.dataset.tab}`;
+    b.setAttribute("role", "tab");
+    b.setAttribute("aria-controls", "panelScroll");
+    b.setAttribute("aria-selected", String(active));
+    b.tabIndex = active ? 0 : -1;
+    if (active) b.scrollIntoView({ block: "nearest", inline: "nearest" });
+  }
 }
 tabsEl.addEventListener("click", (ev) => {
   const b = ev.target.closest(".tab");
   if (b) setTab(b.dataset.tab);
+});
+tabsEl.addEventListener("keydown", (ev) => {
+  if (!["ArrowLeft", "ArrowRight", "Home", "End"].includes(ev.key)) return;
+  ev.preventDefault();
+  const buttons = [...tabsEl.querySelectorAll(".tab")];
+  const index = buttons.findIndex((b) => b.dataset.tab === tab);
+  const next = ev.key === "Home" ? 0 : ev.key === "End" ? buttons.length - 1 : (index + (ev.key === "ArrowRight" ? 1 : -1) + buttons.length) % buttons.length;
+  setTab(buttons[next].dataset.tab);
+  buttons[next].focus();
 });
 
 function renderContext() {
@@ -992,13 +1053,13 @@ function renderThread() {
   panelScroll.scrollTop = panelScroll.scrollHeight;
 }
 
-function renderActivity() {
+function renderActivity(target = panelScroll) {
   const entries = [];
   for (const n of state.notes || []) entries.push({ at: n.at, kind: "note", n });
   for (const ev of state.recent_events || []) entries.push({ at: ev.at, kind: "event", ev });
   entries.sort((a, b) => (a.at < b.at ? -1 : a.at > b.at ? 1 : 0));
   if (!entries.length) {
-    panelScroll.innerHTML = `<div class="empty">No activity yet.</div>`;
+    target.innerHTML = `<div class="empty">No discussion activity yet.</div>`;
     return;
   }
   let day = "";
@@ -1019,19 +1080,35 @@ function renderActivity() {
     const dot = ev.type === "status" ? `st-${ev.to}` : ev.type === "added" ? "st-added" : ev.type === "removed" ? "st-removed" : ev.type.startsWith("diagram") ? "st-diagram" : "st-other";
     html.push(`<div class="event ev-${esc(ev.type)}"><i class="ev-dot ${esc(dot)}"></i><time title="${esc(ev.at)}">${clock(ev.at)}</time><button type="button" class="anchor-chip" data-anchor-key="${esc(key)}">${esc(label)}</button><span class="event-text">${esc(describeEvent(ev))}</span></div>`);
   }
-  panelScroll.innerHTML = `<div class="activity">${html.join("")}</div>`;
-  panelScroll.scrollTop = panelScroll.scrollHeight;
+  target.innerHTML = `<h3>Discussion & plan activity</h3><div class="activity">${html.join("")}</div>`;
 }
 
-function renderChanges() {
-  panelScroll.innerHTML = renderChangesPanel({ state, events: state.events_since || [], since, sinceBasis, statusLabel, review, beforeMode });
+function renderChanges(target = panelScroll) {
+  target.innerHTML = renderChangesPanel({ state, events: state.events_since || [], since, sinceBasis, statusLabel, review, beforeMode });
 }
 
 function renderPanel() {
   renderContext();
-  if (tab === "thread") renderThread();
-  else if (tab === "activity") renderActivity();
-  else renderChanges();
+  updateTabs();
+  composer.hidden = WORKFLOW_TABS.includes(tab);
+  if (tab === "thread") { workflow.detach(); renderThread(); }
+  else if (!state.workflow?.enabled && ["activity", "changes"].includes(tab)) {
+    workflow.detach();
+    if (tab === "activity") { renderActivity(); panelScroll.scrollTop = panelScroll.scrollHeight; }
+    else renderChanges();
+  }
+  else {
+    let host = panelScroll.querySelector(`[data-workflow-view="${tab}"]`);
+    if (!host) {
+      panelScroll.innerHTML = `<div data-workflow-view="${tab}"></div>${["activity", "changes"].includes(tab) ? '<div class="wf-legacy"></div>' : ""}`;
+      host = panelScroll.querySelector("[data-workflow-view]");
+      panelScroll.scrollTop = 0;
+    }
+    const legacy = panelScroll.querySelector(".wf-legacy");
+    if (tab === "activity") renderActivity(legacy);
+    if (tab === "changes") renderChanges(legacy);
+    workflow.mount(host, tab);
+  }
   const queued = (state.notes || []).filter((n) => n.state === "queued").length;
   sendBtn.disabled = queued === 0;
   sendBtn.textContent = queued ? `Send ${queued}` : "Send";
@@ -1248,7 +1325,7 @@ function openSheet(open) {
 }
 sheetHandle.addEventListener("click", () => openSheet(!document.body.classList.contains("sheet-open")));
 function renderSheetHandle() {
-  sheetTitle.textContent = selectionLabel;
+  sheetTitle.textContent = WORKFLOW_TABS.includes(tab) ? `${tab[0].toUpperCase()}${tab.slice(1)}` : selectionLabel;
   const queued = (state.notes || []).filter((n) => n.state === "queued").length;
   const pending = (state.notes || []).filter((n) => n.state === "sent").length;
   const n = queued || pending;
@@ -1331,6 +1408,11 @@ function connect() {
           wb.sourceChanged(ev2.diagram, ev2.to, d ? d.hash : "");
         }
       }
+    } else if (msg.type === "workflow") {
+      if (!(await refreshState())) return;
+      paint();
+      renderTopbar();
+      renderPanel();
     } else if (msg.type === "notes") {
       const ok = await refreshState();
       if (!ok) return;

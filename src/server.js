@@ -147,6 +147,7 @@ export async function serve({ host = "127.0.0.1", port = 4747, log = () => {}, o
   app.use((req, res, next) => {
     if (/^\/boards\/[a-f0-9]{12}\/api\/attachments$/.test(req.path) && req.method === "POST") return rawImage(req, res, next);
     if (/^\/boards\/[a-f0-9]{12}\/api\/whiteboard\//.test(req.path)) return bigJson(req, res, next);
+    if (/^\/boards\/[a-f0-9]{12}\/api\/workflow\/(?:run\/(?:submit|integrate)|(?:validate|eval)\/result|spec\/reconciled)$/.test(req.path)) return bigJson(req, res, next);
     return smallJson(req, res, next);
   });
 
@@ -233,6 +234,11 @@ export async function serve({ host = "127.0.0.1", port = 4747, log = () => {}, o
       // keep root
     }
     if (!(real === realRoot || real.startsWith(realRoot + path.sep))) return res.status(403).type("text").send("outside plan directory");
+    // Sidecar journals contain lease credentials. Only purpose-built attachment
+    // and evidence routes may expose sidecar files, including through symlinks.
+    let stateDir = board.dir;
+    try { stateDir = fs.realpathSync(stateDir); } catch { /* use resolved path */ }
+    if (real === stateDir || real.startsWith(stateDir + path.sep) || path.relative(realRoot, real).split(path.sep).some((part) => part.endsWith(".board"))) return res.status(403).type("text").send("private board state");
     res.sendFile(real, { dotfiles: "deny" }, (err) => {
       if (err && !res.headersSent) res.status(err.status || 500).type("text").send("cannot serve asset");
     });
@@ -243,6 +249,36 @@ export async function serve({ host = "127.0.0.1", port = 4747, log = () => {}, o
     const board = getBoard(req, res);
     if (!board) return;
     res.json(board.state());
+  });
+  app.get("/boards/:key/api/workflow", (req, res) => {
+    const board = getBoard(req, res);
+    if (board) res.json(board.workflow.publicState());
+  });
+  app.get("/boards/:key/api/workflow/history", (req, res) => {
+    const board = getBoard(req, res);
+    if (board) res.json(board.workflow.history(req.query));
+  });
+  app.get("/boards/:key/api/workflow/resume", (req, res) => {
+    const board = getBoard(req, res);
+    if (board) res.json(board.workflow.resume(req.query.since));
+  });
+  app.get("/boards/:key/api/workflow/compare", (req, res) => {
+    const board = getBoard(req, res);
+    if (board) res.json(board.workflow.compare(req.query.from, req.query.to));
+  });
+  app.get("/boards/:key/api/workflow/evidence/:id", (req, res) => {
+    const board = getBoard(req, res);
+    if (!board) return;
+    const evidence = board.workflow.evidence(req.params.id);
+    res.setHeader("X-Content-Type-Options", "nosniff");
+    res.setHeader("Content-Security-Policy", "default-src 'none'; sandbox");
+    res.setHeader("Content-Disposition", `attachment; filename="${evidence.name.replace(/[^\x20-\x7e]/g, "_")}"; filename*=UTF-8''${encodeURIComponent(evidence.name)}`);
+    res.type("application/octet-stream").sendFile(evidence.path);
+  });
+  app.post("/boards/:key/api/workflow/:family/:action", (req, res) => {
+    const board = getBoard(req, res);
+    if (!board) return;
+    res.json(board.workflow.mutate(req.params.family, req.params.action, req.body || {}));
   });
   app.post("/boards/:key/api/seen", (req, res) => {
     const board = getBoard(req, res);
@@ -292,7 +328,12 @@ export async function serve({ host = "127.0.0.1", port = 4747, log = () => {}, o
     if (!board) return;
     if (!board.model) return res.status(409).json({ error: board.error || "plan not readable" });
     const stem = path.basename(board.path, path.extname(board.path));
-    const md = exportMarkdown({ source: board.source, model: board.model, store: board.store, planPath: board.path, version });
+    const workflow = board.workflow.exportState();
+    if (req.query.format === "json") {
+      if (req.query.download !== undefined) res.setHeader("Content-Disposition", `attachment; filename="${stem}-with-history.json"`);
+      return res.json({ schema_version: 1, plan: { path: board.path, title: board.model.title, source: board.source }, notes: board.store.notes, events: board.store.events, workflow });
+    }
+    const md = exportMarkdown({ source: board.source, model: board.model, store: board.store, planPath: board.path, version, workflow });
     if (req.query.download !== undefined) res.setHeader("Content-Disposition", `attachment; filename="${stem}-with-threads.md"`);
     res.type("text/markdown; charset=utf-8").send(md);
   });
@@ -377,6 +418,11 @@ export async function serve({ host = "127.0.0.1", port = 4747, log = () => {}, o
     const timeoutSec = Number(req.query.timeout || 0);
     const timeoutMs = Number.isFinite(timeoutSec) && timeoutSec > 0 ? timeoutSec * 1000 : 0;
     const owner = req.query.owner ? String(req.query.owner).slice(0, 80) : null;
+    if (board.workflow.state.config) {
+      board.workflow.reconcile();
+      try { board.workflow.coordinator(board.workflow.state, { worker: req.query.worker, token: req.query.token }); }
+      catch (err) { return res.status(err.status || 409).json({ error: err.message, code: err.code }); }
+    }
     const takeover = req.query.takeover === "1" || req.query.takeover === "true";
     let pollRef = null;
     let closed = false;
@@ -386,7 +432,7 @@ export async function serve({ host = "127.0.0.1", port = 4747, log = () => {}, o
     });
     let result;
     try {
-      const wait = board.waitForNotes({ timeoutMs, owner, takeover });
+      const wait = board.waitForNotes({ timeoutMs, owner, takeover, worker: req.query.worker, coordinatorToken: req.query.token });
       pollRef = wait.poll;
       result = await wait.promise;
     } catch (err) {
@@ -395,6 +441,11 @@ export async function serve({ host = "127.0.0.1", port = 4747, log = () => {}, o
     }
     if (closed) return;
     if (result.status === "feedback") {
+      if (board.workflow.state.config) {
+        try { board.workflow.coordinator(board.workflow.state, { worker: req.query.worker, token: req.query.token }); }
+        catch { board.releasePoll(pollRef); return res.json({ status: "replaced", plan: { path: board.path } }); }
+      }
+      board.workflow.observeInstructions(result.notes);
       const notes = board.notesForAgent(result.notes);
       const body = {
         status: "feedback",
@@ -404,6 +455,10 @@ export async function serve({ host = "127.0.0.1", port = 4747, log = () => {}, o
       };
       const ids = result.notes.map((n) => n.id);
       res.on("finish", () => {
+        if (board.workflow.state.config) {
+          try { board.workflow.coordinator(board.workflow.state, { worker: req.query.worker, token: req.query.token }); }
+          catch { board.releasePoll(pollRef); return; }
+        }
         board.markDelivered(ids);
         board.releasePoll(pollRef);
       });
@@ -438,7 +493,7 @@ export async function serve({ host = "127.0.0.1", port = 4747, log = () => {}, o
   app.use((err, req, res, _next) => {
     log(`error: ${err && err.stack ? err.stack : err}`);
     if (res.headersSent) return;
-    res.status(err && err.status ? err.status : 500).json({ error: err && err.message ? err.message : "server error" });
+    res.status(err && err.status ? err.status : 500).json({ error: err && err.message ? err.message : "server error", ...(err.code ? { code: err.code } : {}) });
   });
 
   // ---- websockets -------------------------------------------------------------
@@ -536,7 +591,7 @@ export async function serve({ host = "127.0.0.1", port = 4747, log = () => {}, o
   const idleMs = Number(process.env.PLANBOARD_IDLE_TIMEOUT_MS || 0);
   if (idleMs > 0) {
     setInterval(() => {
-      const busy = [...boards.values()].some((b) => b.clients.size > 0 || b.poll);
+      const busy = [...boards.values()].some((b) => b.clients.size > 0 || b.poll || b.workflow.state.coordinator || Object.values(b.workflow.state.attempts).some((a) => a.phase === "running") || Object.values(b.workflow.state.jobs).some((j) => j.phase === "running"));
       if (busy) lastBusy = Date.now();
       else if (Date.now() - lastBusy > idleMs) {
         log(`idle for ${idleMs}ms, stopping`);
@@ -648,6 +703,10 @@ function renderBoardPage(board) {
         <button class="tab active" data-tab="thread">Thread</button>
         <button class="tab" data-tab="activity">Activity</button>
         <button class="tab" data-tab="changes">Changes</button>
+        <button class="tab" data-tab="requirements">Requirements</button>
+        <button class="tab" data-tab="execution">Execution</button>
+        <button class="tab" data-tab="validation">Validation</button>
+        <button class="tab" data-tab="resume">Resume</button>
       </nav>
     </div>
     <div class="panel-scroll" id="panelScroll"></div>
@@ -680,6 +739,7 @@ function renderBoardPage(board) {
       <dt>Esc</dt><dd>back to the plan (closes overlays first)</dd>
       <dt>n / p</dt><dd>next / previous change since your last visit</dd>
       <dt>1 · 2 · 3</dt><dd>Thread · Activity · Changes tab</dd>
+      <dt>4 · 5 · 6 · 7</dt><dd>Requirements · Execution · Validation · Resume tab</dd>
       <dt>?</dt><dd>this help</dd>
     </dl>
     <p class="muted">In the note box: Enter adds the note, ⌘/Ctrl+Enter adds and sends, Shift+Enter is a new line. Paste or drop a screenshot to attach it.</p>

@@ -13,8 +13,9 @@ import { exportMarkdown } from "./export.js";
 import { STATUSES, STATUS_LABEL, lint, normalizeStatus, parsePlan, setItemStatus } from "./plan.js";
 import { BoardStore, anchorKey } from "./store.js";
 import { PACKAGE_ROOT, version } from "./version.js";
+import { WORKFLOW_COMMANDS, workflowCommand } from "./workflow-cli.js";
 
-const BOOL_FLAGS = new Set(["no-open", "json", "pending", "global", "takeover", "help", "version", "brief", "hook", "force", "quiet", "agents-md"]);
+const BOOL_FLAGS = new Set(["no-open", "json", "pending", "global", "takeover", "help", "version", "brief", "hook", "force", "quiet", "agents-md", "once", "coordinator"]);
 
 export function parseArgs(argv) {
   const flags = {};
@@ -206,10 +207,13 @@ async function cmdPoll(planArg, flags, ctx) {
   if (flags.timeout && !(Number.isFinite(timeout) && timeout >= 0)) throw new CliError("--timeout must be a number of seconds");
   const owner = flags.owner ? String(flags.owner) : `${os.hostname()}:${process.ppid} (pass --owner "<model>, effort <level>")`;
   const params = new URLSearchParams({ timeout: String(timeout), owner });
+  if (flags.worker) params.set("worker", String(flags.worker));
+  if (flags.token) params.set("token", String(flags.token));
   if (flags.takeover) params.set("takeover", "1");
   process.stderr.write(`planboard: waiting for notes on ${path.basename(canonical)}${timeout ? ` (up to ${timeout}s)` : ""} - Ctrl-C is safe, nothing is lost\n`);
   const r = await request("GET", `${api}/poll?${params}`, undefined, { timeoutMs: 0 });
-  if (r.status === 409) throw new CliError(`another poll is already listening on this board (${r.json.owner || "unknown owner"}); pass --takeover to replace it`, { code: 3 });
+  if (r.status === 409 && r.json?.code !== "COORDINATOR_REQUIRED") throw new CliError(r.json?.code && r.json.code !== "LISTENER_ACTIVE" ? `poll failed: ${r.json.error}` : `another poll is already listening on this board (${r.json.owner || "unknown owner"}); pass --takeover to replace it`, { code: 3 });
+  if (r.json?.code === "COORDINATOR_REQUIRED") throw new CliError("this workflow board requires an active coordinator to poll", { code: 3, hint: "pass --worker <coordinator-id> --token <coordinator-token>; register and acquire a coordinator lease first" });
   if (r.status !== 200) throw new CliError(`poll failed: ${r.json && r.json.error ? r.json.error : r.status}`);
   printJson(r.json);
 }
@@ -327,8 +331,14 @@ function formatPlanText(model, store) {
   return lines.join("\n");
 }
 
-function cmdShow(planArg, flags) {
+async function localWorkflow(canonical, model, options) {
+  const { readWorkflow } = await import("./workflow.js");
+  return readWorkflow(canonical, boardDir(canonical), model, options);
+}
+
+async function cmdShow(planArg, flags) {
   const { canonical, model, store } = loadLocal(planArg);
+  const workflow = await localWorkflow(canonical, model);
   if (flags.json) {
     printJson({
       path: canonical,
@@ -339,10 +349,16 @@ function cmdShow(planArg, flags) {
       diagrams: model.diagrams.map((d) => ({ id: d.id, section: d.section, line: d.line })),
       threads: store.threadsSummary(),
       pending: store.pending().map((n) => n.id),
+      workflow,
     });
     return;
   }
   out(formatPlanText(model, store));
+  if (workflow.enabled) {
+    out(`\nWorkflow revision ${workflow.revision}:`);
+    for (const task of workflow.tasks || []) out(`  ${task.id}: ${task.acceptance} · ${task.phase} · ${task.checks_passed || 0}/${task.checks_total || 0} checks${task.blockers?.length ? ` · ${task.blockers.join("; ")}` : ""}`);
+  }
+  if (workflow.error) out(`workflow error: ${workflow.error}`);
 }
 
 function formatThread(notes, label) {
@@ -394,12 +410,13 @@ function cmdNotes(planArg, flags) {
   }
 }
 
-function cmdExport(planArg, flags) {
+async function cmdExport(planArg, flags) {
   const canonical = resolvePlan(planArg);
   const source = fs.readFileSync(canonical, "utf8");
   const model = parsePlan(source);
   const store = new BoardStore(boardDir(canonical));
-  const md = exportMarkdown({ source, model, store, planPath: canonical, version: version() });
+  const workflow = await localWorkflow(canonical, model, { fullHistory: true });
+  const md = flags.json ? JSON.stringify({ schema_version: 1, plan: { path: canonical, title: model.title, source }, notes: store.notes, events: store.events, workflow }, null, 2) + "\n" : exportMarkdown({ source, model, store, planPath: canonical, version: version(), workflow });
   if (flags.out) {
     const target = path.resolve(String(flags.out));
     if (canonicalPlanPath(target) === canonical) throw new CliError("--out must not be the plan file itself");
@@ -412,9 +429,12 @@ function cmdExport(planArg, flags) {
   process.stdout.write(md);
 }
 
-function cmdLint(planArg) {
+async function cmdLint(planArg) {
   const { canonical, model } = loadLocal(planArg);
   const warnings = lint(model);
+  const workflow = await localWorkflow(canonical, model);
+  if (workflow.error) warnings.push({ level: "error", message: `workflow: ${workflow.error}` });
+  for (const issue of workflow.specs?.issues || []) warnings.push({ level: issue.level || "error", message: `workflow: ${issue.message || JSON.stringify(issue)}` });
   if (!warnings.length) return out(`${path.basename(canonical)}: ok (${model.items.filter((i) => i.status).length} tracked items, ${model.sections.length} sections, ${model.diagrams.length} diagrams)`);
   for (const w of warnings) out(`${path.basename(canonical)}:${w.line || 0}: ${w.level}: ${w.message}`);
   if (warnings.some((w) => w.level === "error")) throw new CliError("lint found errors", { code: 2 });
@@ -567,8 +587,9 @@ async function cmdStop(ctx) {
 export async function run(argv) {
   const { flags, positional } = parseArgs(argv);
   if (flags.version) return out(version());
+  const workerHost = positional[0] === "worker" && positional[2] === "register";
   const ctx = {
-    host: flags.host ? String(flags.host) : defaultHost(),
+    host: flags["server-host"] ? String(flags["server-host"]) : flags.host && !workerHost ? String(flags.host) : defaultHost(),
     port: flags.port ? Number(flags.port) : defaultPort(),
     quiet: !!flags.quiet,
   };
@@ -580,6 +601,7 @@ export async function run(argv) {
   const tail = command === "open" ? rest : rest.slice(1);
 
   if (flags.help && command !== "help") return out(helpText({ version: version() }));
+  if (WORKFLOW_COMMANDS.has(command)) return workflowCommand(command, planArg, flags, tail, { ensureBoard, request, printJson, out, ctx });
 
   switch (command) {
     case "help":
@@ -627,7 +649,7 @@ export async function main(argv = process.argv.slice(2)) {
   try {
     await run(argv);
   } catch (err) {
-    if (err instanceof CliError) {
+    if (err instanceof CliError || Number.isInteger(err.exitCode)) {
       process.stderr.write(`planboard: ${err.message}\n${err.hint ? `  ${err.hint}\n` : ""}`);
       process.exitCode = err.exitCode;
       return;

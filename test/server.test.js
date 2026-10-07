@@ -110,6 +110,11 @@ test("assets are confined to the plan directory", async (t) => {
   fs.symlinkSync(target, path.join(tmpDir, "link.txt"));
   const viaLink = await fetch(`${base}/boards/${key}/asset/link.txt`);
   assert.equal(viaLink.status, 403);
+  const sidecar = path.join(tmpDir, "PLAN.board", "workflow", "writer.lock");
+  const privateState = await fetch(`${base}/boards/${key}/asset/PLAN.board/workflow/writer.lock`);
+  assert.equal(privateState.status, 403);
+  fs.symlinkSync(sidecar, path.join(tmpDir, "state-alias.txt"));
+  assert.equal((await fetch(`${base}/boards/${key}/asset/state-alias.txt`)).status, 403);
 });
 
 test("notes: queue, send, poll delivers with thread, reply shows up", async () => {
