@@ -43,8 +43,9 @@ planboard setup cursor            # installs the Cursor skill and project rule (
 planboard setup opencode          # installs the OpenCode skill in .opencode/skills
 ```
 
-Node 22 or newer. Everything runs locally; the only network use is your browser talking to
-`127.0.0.1:4747`. The whiteboard frame is copied from the `lavish-axi` dev dependency at build
+Node 22 or newer. Planboard runs locally and does not call model providers. Its browser talks to
+`127.0.0.1:4747`; explicitly started validation commands may use their own configured network
+access. The whiteboard frame is copied from the `lavish-axi` dev dependency at build
 time; without it the board simply has no whiteboard button.
 
 ## The plan file
@@ -202,9 +203,17 @@ guidance for their host's polling tools.
 | `planboard show <PLAN.md> [--json]` | the plan as the board sees it: ids, statuses, note counts, pending notes |
 | `planboard thread <PLAN.md> <id \| diagram/node \| board>` | one conversation |
 | `planboard notes <PLAN.md> [--pending]` | all notes, or only those sent and not yet delivered |
-| `planboard export <PLAN.md> [--out <file>]` | the plan with every thread folded in as a blockquote under its item, heading, diagram or image, plus the status history - one Markdown file for project records (stdout unless `--out`; also the **Export** button on the board) |
+| `planboard export <PLAN.md> [--json] [--out <file>]` | the plan, discussions, validation evidence references and complete sanitized workflow history; Markdown by default or structured JSON with `--json` (stdout unless `--out`; also the **Export** button on the board) |
 | `planboard lint <PLAN.md>` | missing / duplicate ids |
 | `planboard init [PLAN.md] [--title …]` | scaffold a plan |
+| `planboard spec <PLAN.md> [init\|configure\|refresh\|accept\|reconcile\|reconciled]` | inspect or configure requirements, architecture, decisions and proposed spec changes |
+| `planboard worker <PLAN.md> [register\|coordinator\|claim\|heartbeat\|release\|keepalive]` | inspect workers or manage scoped leases |
+| `planboard run <PLAN.md> [create\|dispatch\|cancel\|submit\|integrate]` | inspect or record work, immutable candidates and integration |
+| `planboard validate <PLAN.md> [enqueue\|start\|heartbeat\|result\|run]` | inspect or execute a configured validation job |
+| `planboard eval <PLAN.md> [enqueue\|start\|heartbeat\|result\|run]` | record structured evaluation trials and calibration evidence |
+| `planboard history <PLAN.md> [--cursor <n>] [--limit <n>]` | paginated workflow events; filters: task, requirement, worker, run, outcome, from, to |
+| `planboard resume <PLAN.md> [--since <cursor>]` | deterministic recovery brief, current work, blockers and stale evidence |
+| `planboard compare <PLAN.md> --from <revision> --to <revision>` | inspect workflow state changes between revisions |
 | `planboard boards` | boards the server knows, with progress and pending notes |
 | `planboard setup claude [--global] [--hook]` | install the Claude Code skill; `--hook` adds a SessionStart hook that lists boards |
 | `planboard setup cursor [--global] [--agents-md]` | install the Cursor skill in `.cursor/skills/planboard/SKILL.md` plus a project rule `.cursor/rules/planboard.mdc`; `--global` installs the skill in `~/.cursor/skills`; `--agents-md` appends a section to the current project's `AGENTS.md` |
@@ -215,6 +224,229 @@ guidance for their host's polling tools.
 Poll delivery is at-least-once: notes are marked delivered only after the response is written,
 so a poll that dies before printing leaves them pending and re-running is safe. One poll per
 board at a time; a second one exits 3 with `LISTENER_ACTIVE` unless it passes `--takeover`.
+
+## Advanced workflow
+
+Advanced workflow is opt-in. A sibling `PLAN.workflow.json` links plan task IDs to
+requirements and acceptance criteria, tracks worker attempts, and binds validation to
+the actual candidate files. Ordinary Markdown plans need no companion file.
+Checkbox status remains reported progress: `[x]` does not grant acceptance. The workflow
+separately reports `not_validated`, `pending`, `accepted`, or `stale`. Required checks must
+pass against the current artifact and contract before dependent work is eligible.
+
+Create the companion through the server with `planboard spec PLAN.md init --key setup-1`.
+Use `--file config.json` to supply a complete configuration. All mutations require a
+caller-chosen `--key` (or `idempotency_key` in JSON): reuse it with the identical request
+to recover a lost response, and choose a new key for new work. Add
+`--expected-revision <n>` when an action depends on a state you reviewed. A conflict exits
+3; inspect the current state before changing the request. Every family accepts its plan
+as the second argument, and mutation payloads can use `--file input.json` or `--file -`.
+Read commands default to JSON and accept `--format markdown`.
+
+### Requirements and checks
+
+For a root-level `PLAN.md` with `- [ ] Implement widget {#widget}`, create
+`docs/requirements.md` containing:
+
+```markdown
+# Requirements
+
+## Widget behavior {#req-widget}
+The widget renders the user's saved preference.
+
+### Scenario: saved preference {#scenario-widget}
+Given a saved preference, opening the widget displays that value.
+```
+
+An example `PLAN.workflow.json` is:
+
+```json
+{
+  "schema_version": 1,
+  "workspace": ".",
+  "sources": [{ "path": "docs/requirements.md", "kind": "requirements" }],
+  "tasks": {
+    "widget": {
+      "objective": "Render the saved preference in the widget",
+      "requirements": ["req-widget"],
+      "criteria": [
+        { "id": "widget-behavior", "text": "The saved preference is displayed" },
+        { "id": "widget-review", "text": "An independent reviewer confirms the requirement" }
+      ],
+      "depends_on": [],
+      "scope": ["src/widget.js", "test/widget.test.js"],
+      "outputs": ["Widget implementation and regression test"],
+      "profile": "ui",
+      "checks": ["widget-test", "widget-review"]
+    }
+  },
+  "checks": {
+    "widget-test": {
+      "method": "command", "required": true, "criteria": ["widget-behavior"],
+      "command": { "executable": "node", "args": ["--test", "test/widget.test.js"], "cwd": ".", "timeout_ms": 30000 }
+    },
+    "widget-review": {
+      "method": "review", "required": true, "criteria": ["widget-review"]
+    }
+  }
+}
+```
+
+`workspace` resolves relative to the plan's directory; use `".."` when the plan is
+`.planboard/PLAN.md` and sources live at the repository root. Source paths and command
+working directories resolve within that workspace. Sources can also use `decisions` or
+`architecture` kinds. Stable source heading anchors identify requirements; missing IDs
+receive durable mappings that remain inspectable. OpenSpec documents can be indexed
+without installing its CLI. Proposed changes remain separate from canonical requirements
+until explicitly reconciled and accepted. After editing sources or the companion, use
+`planboard spec PLAN.md refresh --key refresh-1` and `planboard lint PLAN.md` to inspect
+missing coverage, unknown references, duplicate IDs, dependency cycles and other issues.
+For plain Markdown proposals, add a separate source with `"status": "proposed"`,
+`"change": "change-id"`, and `"operation": "added"`, `"modified"`, or `"removed"`.
+Use `"canonical_ids": { "proposal-id": "canonical-id" }` to identify the requirement
+being modified or removed; keep proposal anchors distinct from canonical anchors.
+Use `planboard spec PLAN.md accept --change <change-id> --file reconciliation.json --key accept-1`
+to record a validated change as `ready_to_reconcile`. Explicitly run
+`planboard spec PLAN.md reconcile --change <change-id> --key archive-1` to invoke the
+installed OpenSpec CLI as `openspec archive <change-id> --yes`, refresh the sources, and
+record archive output as durable evidence. This uses the native CLI's
+[documented archive operation](https://github.com/Fission-AI/OpenSpec/blob/main/docs/cli.md#openspec-archive)
+with its validations enabled; Planboard does not install OpenSpec automatically.
+Failed commands retain their diagnostics and do not finalize the change. The server
+verifies that canonical sources contain the accepted changes before marking reconciliation
+complete. Only directories named `openspec` can be targeted automatically; nested locations
+use their parent as the native CLI working directory. Plain Markdown changes and custom
+OpenSpec directory names require manual canonical source updates, followed by `spec PLAN.md
+refresh --key refresh-2` and `spec PLAN.md reconciled --change <change-id> --outcome passed
+--file evidence.json --key reconciled-1`. The JSON payload can contain `evidence` entries
+with `name` and `text` just like check results. Editing a linked contract or candidate file makes earlier
+acceptance stale; editing unrelated files does not confer or remove acceptance by itself.
+If a native reconciliation process stops before returning its result, inspect its effects
+and confirm that it has stopped before manually finalizing. That recovery requires the
+current `--expected-revision`, a nonempty `--reason`, and evidence; Planboard checks the
+canonical contents and current validation gate again before accepting it.
+
+Built-in starter profiles are `backend`, `ui`, `data`, `statistical-ml`, `research`, and
+`agent-workflow`. Choose checks appropriate to the task: a profile label does not supply
+evidence or turn a worker's report into a pass. `manual` checks accept human evidence;
+`review` checks require a worker independent of the implementing attempt.
+
+### Coordinator and workers
+
+Register each real host session and its absolute workspace:
+
+```sh
+planboard worker PLAN.md register --host codex --label "Widget implementer" --workspace /absolute/project --capabilities implement,validate --key register-1
+planboard worker PLAN.md coordinator --worker WORKER --worker-token WORKER_TOKEN --key coordinate-1
+planboard poll PLAN.md --timeout 30 --worker WORKER --token COORDINATOR_TOKEN --owner "Codex"
+planboard run PLAN.md create --task widget --worker WORKER --token COORDINATOR_TOKEN --key widget-run-1
+planboard run PLAN.md dispatch --run RUN --worker WORKER --token COORDINATOR_TOKEN --phase dispatched --key widget-dispatch-1
+```
+
+Worker and coordinator IDs/tokens come from the preceding JSON responses. Keep tokens
+private and do not include them in board notes or shared transcripts. `--host` for
+registration is one of `codex`, `claude`, `cursor`, or `opencode`; use `--server-host` to
+override the server address. Configured workflow boards require the active coordinator
+lease to poll. Legacy boards keep their existing poll behavior.
+
+Record dispatch before starting a native host subagent or session. Planboard does not
+launch model sessions. Add the known `--host-session-id` once available, with a new key;
+if launch outcome is unknown, record `--phase uncertain` and reconcile before launching
+again. Claim the run from the worker that actually performs it:
+
+```sh
+planboard worker PLAN.md claim --run RUN --worker WORKER --worker-token WORKER_TOKEN --key claim-1
+planboard worker PLAN.md keepalive --attempt ATTEMPT --token ATTEMPT_TOKEN --parent-pid ACTIVE_HOST_PID --max-duration 300 --key alive-1
+planboard run PLAN.md submit --attempt ATTEMPT --token ATTEMPT_TOKEN --summary "Implemented widget and regression test" --key candidate-1
+```
+
+The claim returns the task packet: objective, source requirements, acceptance criteria,
+dependencies, scope, outputs, validation configuration and revisions. Heartbeats run
+every 30 seconds. Keepalive requires the active host's PID, stops after a bounded duration
+(300 seconds by default), and exits on parent death, invalid token or signal. Keep it as a
+tracked command only for the active turn; an app's long-lived PID cannot prove a turn is
+still working. Stop it and release the attempt when the turn ends. Coordinator keepalive
+uses `--coordinator --worker WORKER --token COORDINATOR_TOKEN`. Restarted attempts require
+explicit renewal before submission. Concurrent overlapping workspace scopes are rejected.
+
+Candidate submission records file hashes and queues the configured checks. It does not
+mark the task accepted. For independent workspaces, integrate actual files into the
+coordinator's workspace, declare `integration_of` task IDs on the integration task, then
+record `run PLAN.md integrate --task TASK --worker WORKER --token COORDINATOR_TOKEN
+--artifacts ARTIFACT_1,ARTIFACT_2 --key integration-1`. The combined candidate needs its
+own required checks. A repair is a new run with `--repair-of RESULT`; it does not overwrite
+the failed result. Apply a finite repair budget rather than retrying indefinitely.
+
+### Validation and evaluation runners
+
+`planboard validate PLAN.md run --job JOB --worker WORKER --worker-token WORKER_TOKEN
+--key check-1` explicitly starts a named job, runs the configured executable with a literal
+argument array (no shell), maintains the job lease, and submits bounded stdout/stderr and
+execution metadata as durable evidence. Each stream is limited to 64 KiB. A nonzero exit
+is `failed`; launch errors, signals and timeouts are `error`. The server records artifacts
+and jobs but never executes commands from browser requests. Runners execute with the
+calling user's ordinary process permissions, so review executable configurations before
+running them. A retry returns an already recorded result. An active, expired, reassigned
+or unconfirmed job never triggers an automatic command replay: a prior execution may have
+already produced side effects. Inspect history, explicitly recover or enqueue a new job,
+then use a new `--key`. Before every execution the runner confirms the authoritative job
+identity and renews its fencing token with a fresh operation key.
+
+For a manual/reviewer check, call `validate PLAN.md start --job JOB --worker WORKER
+--worker-token WORKER_TOKEN --key review-start-1`, then submit the returned job token with
+`validate PLAN.md result --file review.json --key review-result-1`. Example payload:
+
+```json
+{
+  "job": "JOB", "token": "JOB_TOKEN", "outcome": "passed",
+  "criteria": [{ "id": "widget-review", "outcome": "passed", "reference": "review.txt" }],
+  "evidence": [{ "name": "review.txt", "text": "Compared saved and empty preferences against req-widget; both scenarios behaved as specified." }]
+}
+```
+
+An evaluation check uses `"method": "evaluation"`, a command of the same executable/args
+shape, and an `evaluation` object such as:
+
+```json
+{
+  "development": [{ "id": "dev-1", "input": "A development example" }],
+  "held_out": [{ "id": "held-1", "input": "An unseen example" }],
+  "trials": 2, "max_retries": 1, "min_pass_rate": 1,
+  "budget": { "max_trials": 8, "timeout_ms": 60000 },
+  "grader": "model",
+  "calibration": [{ "id": "known-good", "expected": "passed" }, { "id": "known-bad", "expected": "failed" }]
+}
+```
+
+Start it with `planboard eval PLAN.md run --job JOB --worker WORKER --worker-token
+WORKER_TOKEN --key eval-1`. The external harness owns provider calls and must print one
+JSON object to stdout: `{"trials":[{"scenario":"held-1","trial":1,"retry":0,
+"outcome":"passed","duration_ms":100}],"calibration":[{"id":"known-good",
+"outcome":"passed"},{"id":"known-bad","outcome":"failed"}]}`. This abbreviated example
+shows the shape; a complete result must include all declared scenarios and trial numbers.
+Trials are one-based and retries start at zero. All attempts count against the budget.
+Missing trials, errors, exhausted budgets or missing/incorrect model-grader calibration
+cannot become a pass. Planboard computes rates, variation and calibration from records;
+it does not trust a prose success claim or provide a built-in model grader.
+
+### Recovery and host behavior
+
+Use `planboard resume PLAN.md --format markdown` when returning after a crash or handoff,
+`history` to trace instructions, attempts and check results, and `compare --from N --to M`
+to inspect revisions. History starts at workflow activation; it does not reconstruct
+unrecorded earlier work. `show --json`, `lint`, and `export` also include workflow state.
+The journal under `PLAN.board/workflow/` is the source of truth; snapshots are caches.
+Workflow journals and snapshots are machine-local private files: transaction receipts can
+contain lease credentials. Keep them out of version control and share sanitized Markdown
+or public JSON exports for workflow history. Existing board notes and status events remain
+versionable. The server is the single writer, while inspection commands use read-only access.
+
+All four installed host skills include this protocol. Claude Code uses tracked background
+commands when available; Codex, Cursor and OpenCode use bounded foreground commands or
+collect their actual tracked handles. Keep model labels and native session IDs only when
+known. Native delegation and tools remain subject to the user's request and each host's
+permissions. Do not create commits, branches or pushes unless the user explicitly requests
+that Git action. Skills and keepalive processes do not keep an ended agent turn working.
 
 ## Agent support
 
@@ -318,13 +550,15 @@ permissions.
 | Path | Contents |
 | --- | --- |
 | `PLAN.board/` next to the plan | `notes.json` (the conversation), `events.jsonl` (derived status history), `snapshot.json`, `attachments/` (pasted screenshots, whiteboard sketches as PNG + `.excalidraw`), `visits.json` (this machine's viewing state), `whiteboards/` (autosaved working scenes) |
+| `PLAN.board/workflow/` | private workflow journal, snapshot cache, runtime lock and evidence; use sanitized exports for shared workflow history |
 | `~/.planboard/` | `server.json` (running daemon), `boards.json` (known boards), `server.log` |
 
 Set `PLANBOARD_STATE_DIR=<dir>` to keep every board's sidecar under one directory (keyed by a
-hash of the plan path) instead of beside the plan. The sidecar is meant to be committed with the
-plan - notes, replies, attachments and the status history are project knowledge - and planboard
-writes a `.gitignore` inside it that keeps the machine-local `visits.json` and the autosaved
-`whiteboards/` scenes out of the repository.
+hash of the plan path) instead of beside the plan. Notes, replies, attachments and status
+history can be versioned with the plan. Planboard's sidecar `.gitignore` excludes local
+`visits.json`, autosaved `whiteboards/` scenes, and private workflow journal/snapshot files.
+Workflow transaction receipts contain lease credentials; share sanitized Markdown or public
+JSON exports instead of committing those files.
 
 ## Environment
 
@@ -357,10 +591,26 @@ ip -4 addr show eth0 | grep inet                     # e.g. 192.168.65.3 → ope
 
 ```sh
 npm test                 # node:test - parser, diff, store, export, server, setup
+npm run test:browser     # real workflow journey in Playwright, including mobile and keyboard use
 npm run build            # bundle client/ + Mermaid into dist/client/, copy the whiteboard frame into dist/whiteboard/
 node scripts/build.js --watch
 planboard server         # foreground server with logs on stderr
 ```
+
+The workflow suite covers journal recovery and idempotency, exclusive ownership, fenced
+leases, requirements and OpenSpec reconciliation, strict evidence gates, repeated evaluations,
+and protocol clients for all four hosts. The browser journey demonstrates two workers,
+failed integration, successful repair, restart recovery, stale acceptance, evidence downloads,
+historical comparison and resume. It writes screenshots under `test-results/workflow/` and
+uses `PLANBOARD_BROWSER` when supplied, an installed Brave/Chrome browser on macOS, or
+Playwright's Chromium.
+
+Native host verification on 2026-10-07: Codex CLI 0.157.1 completed registration, claim and
+submission using GPT-6 Astra with Extra High reasoning; independent harness validation
+accepted its candidate. Live Claude Code testing remains unverified because the installed
+CLI was not logged in. Cursor and OpenCode live testing remain unverified because their
+CLIs were unavailable. Simulated protocol tests cover all four host identities; they do
+not substitute for those missing native runs.
 
 Layout: `src/plan.js` (Markdown → model + HTML), `src/diff.js` (plan snapshots → status
 events), `src/store.js` (sidecar persistence: notes, events, attachments, whiteboard scenes),

@@ -14,6 +14,7 @@ import { diffSnapshots, snapshotOf } from "./diff.js";
 import { boardDir, canonicalPlanPath, planKey } from "./paths.js";
 import { STATUS_LABEL, findAnchorTarget, parsePlan, renderMarkdown, setItemStatus } from "./plan.js";
 import { ATTACHMENT_TYPES, BoardStore, DEPTHS, anchorKey } from "./store.js";
+import { Workflow } from "./workflow.js";
 
 export class ListenerActiveError extends Error {
   constructor(owner) {
@@ -47,6 +48,7 @@ export class Board extends EventEmitter {
     this.pollOwner = null;
     this.watcher = null;
     this.lastEvents = [];
+    this.workflow = new Workflow(this);
   }
 
   get url() {
@@ -71,10 +73,13 @@ export class Board extends EventEmitter {
     this.watcher.on("change", () => this.refresh());
     this.watcher.on("unlink", () => this.refresh());
     this.watcher.on("error", (err) => this.log(`watcher error for ${this.path}: ${err.message}`));
+    this.workflowTimer = setInterval(() => this.workflow.reconcile(), 30000);
+    this.workflowTimer.unref();
     return this;
   }
 
   async close() {
+    clearInterval(this.workflowTimer);
     if (this.watcher) await this.watcher.close().catch(() => {});
     this.watcher = null;
     if (this.poll) {
@@ -91,9 +96,10 @@ export class Board extends EventEmitter {
       }
     }
     this.clients.clear();
+    this.workflow.close();
   }
 
-  refresh() {
+  refresh(observation = {}) {
     let source;
     try {
       source = fs.readFileSync(this.path, "utf8");
@@ -115,6 +121,7 @@ export class Board extends EventEmitter {
     this.error = null;
     this.updatedAt = new Date().toISOString();
     this.lastEvents = events;
+    this.workflow.reconcile(observation);
     if (events.length) this.log(`${path.basename(this.path)}: ${events.length} change(s)`);
     this.emit("plan", events);
     this.broadcast({ type: "plan", events });
@@ -157,6 +164,7 @@ export class Board extends EventEmitter {
       attachment_base: this.attachmentBase,
       attachment_types: Object.keys(ATTACHMENT_TYPES).filter((t) => t.startsWith("image/")),
       features: this.features,
+      workflow: this.workflow.publicState(),
     };
   }
 
@@ -232,6 +240,7 @@ export class Board extends EventEmitter {
   send(ids = null) {
     const sent = this.store.sendQueued(ids);
     if (sent.length) {
+      this.workflow.observeInstructions(sent);
       this.broadcast({ type: "notes", reason: "sent", ids: sent.map((n) => n.id) });
       this.wakePoll();
     }
@@ -311,7 +320,7 @@ export class Board extends EventEmitter {
     const tmp = `${this.path}.${process.pid}.tmp`;
     fs.writeFileSync(tmp, change.source);
     fs.renameSync(tmp, this.path);
-    this.refresh();
+    this.refresh({ actor: "status-command", type: "task.status", task: change.item.id, from: change.from, to: change.to });
     return { item: change.item.id, text: change.item.text, from: change.from, to: change.to };
   }
 
@@ -323,7 +332,7 @@ export class Board extends EventEmitter {
   // was immediate or refused) and is the only handle `releasePoll` accepts, so a
   // refused second poll can never release the first one. The caller marks
   // delivery only after its response is written - see `markDelivered`.
-  waitForNotes({ timeoutMs = 0, owner = null, takeover = false } = {}) {
+  waitForNotes({ timeoutMs = 0, owner = null, takeover = false, worker = null, coordinatorToken = null } = {}) {
     if (this.poll) {
       if (!takeover) return { promise: Promise.reject(new ListenerActiveError(this.poll.owner)), poll: null };
       const old = this.poll;
@@ -336,7 +345,7 @@ export class Board extends EventEmitter {
       this.pollOwner = owner;
       return { promise: Promise.resolve({ status: "feedback", notes: pending }), poll: null };
     }
-    const poll = { owner, resolve: null, timer: null };
+    const poll = { owner, worker, coordinatorToken, resolve: null, timer: null };
     const promise = new Promise((resolve) => {
       poll.resolve = (value) => {
         if (this.poll === poll) this.poll = null;
@@ -354,6 +363,10 @@ export class Board extends EventEmitter {
 
   wakePoll() {
     if (!this.poll) return;
+    if (this.workflow.state.config) {
+      try { this.workflow.coordinator(this.workflow.state, { worker: this.poll.worker, token: this.poll.coordinatorToken }); }
+      catch { this.poll.resolve({ status: "replaced" }); return; }
+    }
     const pending = this.store.pending();
     if (!pending.length) return;
     const poll = this.poll;

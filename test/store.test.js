@@ -92,7 +92,7 @@ test("the sidecar .gitignore gains missing lines without losing custom ones", ()
   fs.writeFileSync(path.join(dir, ".gitignore"), "visits.json\nmy-own-line\n");
   new BoardStore(dir);
   const text = fs.readFileSync(path.join(dir, ".gitignore"), "utf8");
-  assert.deepEqual(text.trim().split("\n"), ["visits.json", "my-own-line", "*.tmp", "whiteboards/"]);
+  assert.deepEqual(text.trim().split("\n"), ["visits.json", "my-own-line", "*.tmp", "whiteboards/", "workflow/writer.lock", "workflow/writer.guard", "workflow/snapshot.json", "workflow/journal.jsonl"]);
   new BoardStore(dir);
   assert.equal(fs.readFileSync(path.join(dir, ".gitignore"), "utf8"), text, "idempotent");
 });

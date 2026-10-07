@@ -110,7 +110,7 @@ function describeChange(ev) {
   }
 }
 
-export function exportMarkdown({ source, model, store, planPath, version = "", at = new Date() }) {
+export function exportMarkdown({ source, model, store, planPath, version = "", at = new Date(), workflow = null }) {
   const lines = String(source).replace(/\r\n?/g, "\n").split("\n");
   const planDir = path.dirname(planPath);
   const attachmentRef = (f) => {
@@ -233,6 +233,24 @@ export function exportMarkdown({ source, model, store, planPath, version = "", a
             : "plan";
       out.push(`- ${formatWhen(ev.at).slice(11)} · ${target}: ${describeChange(ev)}`);
     }
+  }
+  if (workflow?.enabled) {
+    out.push("", "## Workflow", "", `Recorded revision: ${workflow.revision}. ${workflow.history_coverage || ""}`, "");
+    if (workflow.error) out.push(`Workflow error: ${workflow.error}`, "");
+    for (const task of workflow.tasks || []) {
+      out.push(`- ${task.text} (\`${task.id}\`): marked ${task.status}; ${task.acceptance.replaceAll("_", " ")}; ${task.checks_passed}/${task.checks_total} required checks passed.`);
+      for (const blocker of task.blockers || []) out.push(`  - ${blocker}`);
+    }
+    out.push("", "### Requirements and decisions", "");
+    for (const record of [...Object.values(workflow.specs?.requirements || {}), ...Object.values(workflow.specs?.decisions || {})]) out.push(`- \`${record.id}\` (${record.status || "canonical"}): ${record.title || record.text} — ${record.source || "inline"}, revision \`${record.revision}\``);
+    out.push("", "### Validation evidence", "");
+    for (const result of Object.values(workflow.results || {})) {
+      const stale = workflow.artifacts?.[result.artifact]?.stale || result.fresh === false;
+      out.push(`- ${result.at} · \`${result.task}\` / \`${result.check}\`: **${result.outcome}**${stale ? " (stale)" : ""}, artifact \`${result.artifact}\`.`);
+      for (const evidence of result.evidence || []) out.push(`  - ${evidence.name}: SHA-256 \`${evidence.hash}\``);
+    }
+    out.push("", "### Recent workflow activity", "");
+    for (const event of workflow.events || []) out.push(`- ${event.at} · ${event.type} · ${event.task || event.worker || event.actor} (event \`${event.id}\`)`);
   }
   return out.join("\n") + "\n";
 }

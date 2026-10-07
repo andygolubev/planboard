@@ -197,3 +197,10 @@ test("setup defaults to Claude, advertises all hosts, and rejects unsupported op
   assert.equal(fs.existsSync(path.join(f.project, ".agents")), false);
   assert.equal(fs.existsSync(path.join(f.project, ".opencode")), false);
 });
+
+test("all packaged host skills teach explicit dispatch, leases and evidence gates", () => {
+  for (const relative of ["skills/planboard/SKILL.md", "skills/codex/planboard/SKILL.md", "skills/cursor/planboard/SKILL.md", "skills/opencode/planboard/SKILL.md"]) {
+    const skill = fs.readFileSync(path.join(root, relative), "utf8");
+    for (const phrase of ["Record dispatch before", "--parent-pid", "--max-duration 300", "--coordinator", "--worker <id> --token <coordinator-token>", "separate from accepted/not_validated/pending/stale", "Planboard does", "does not", "No model API is built in"]) assert.ok(skill.includes(phrase), `${relative}: missing ${phrase}`);
+  }
+});

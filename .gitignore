@@ -37,6 +37,10 @@ report.[0-9]*.[0-9]*.[0-9]*.json
 # Keep notes.json, events.jsonl, snapshot.json, and attachments versioned with plans.
 **/*.board/visits.json
 **/*.board/whiteboards/
+**/*.board/workflow/writer.lock
+**/*.board/workflow/writer.guard
+**/*.board/workflow/snapshot.json
+**/*.board/workflow/journal.jsonl
 
 # Atomic-write leftovers and local scratch directories
 *.tmp
