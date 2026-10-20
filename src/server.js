@@ -675,6 +675,7 @@ function renderBoardPage(board) {
 <header class="topbar" id="topbar">
   <a class="brand" href="/" title="All boards">planboard</a>
   <div class="board-name" id="boardTitle">${escapeHtml(state.title)}</div>
+  <select class="board-switcher" id="boardSwitcher" aria-label="Switch plan" hidden></select>
   <div class="progress" id="progress"></div>
   <button type="button" class="changes-chip" id="changesChip" hidden></button>
   <div class="spacer"></div>
@@ -684,12 +685,13 @@ function renderBoardPage(board) {
   <div class="presence-wrap" id="presence"></div>
 </header>
 <div class="layout" id="layout">
-  <nav class="contents" aria-label="Plan contents"><div class="contents-title">Contents</div><div id="contentsLinks"></div></nav>
+  <nav class="contents" aria-label="Plan contents"><div class="contents-title">Contents</div><div id="contentsLinks"></div><label class="mobile-contents" for="sectionSelect">Go to section<select id="sectionSelect"></select></label></nav>
   <div class="panel-resizer" data-resize-panel="left" role="separator" tabindex="0" aria-label="Resize contents" aria-orientation="vertical" title="Drag to resize contents. Use arrow keys when focused; double-click to reset."></div>
   <div class="board-wrap">
     <div class="toolbar" id="toolbar" hidden>
       <span class="spacer"></span>
-      <button type="button" class="toolbar-btn" id="collapseBtn" title="Expand or collapse all section details and tasks">Expand all</button>
+      <button type="button" class="toolbar-btn" id="expandBtn" title="Show all supporting details">Expand all</button>
+      <button type="button" class="toolbar-btn" id="collapseBtn" title="Close supporting details; main content stays visible">Collapse details</button>
     </div>
     <main id="board" class="board"></main>
     <div class="ruler" id="ruler" title="Where the changes and notes are - click to jump"></div>

@@ -9,12 +9,12 @@ that item - through a long poll, edits the plan, flips statuses as work lands, a
 next to the item. Notes, replies and the status history persist beside the plan, so the same
 board serves the whole project day after day. The plan is the conversation; the chat log is not.
 
-![planboard in light theme: numbered contents, expandable tasks, and an item discussion](docs/board.jpg)
+![planboard in light theme: the golden plan outline, Now summary, continuous sections, and a section discussion](docs/board.jpg)
 
 <details>
 <summary>See the dark theme</summary>
 
-![planboard in dark theme with the moonlit alpine background](docs/board-dark.jpg)
+![planboard in dark theme: architecture, supporting details, and decision options on one continuous page](docs/board-dark.jpg)
 
 </details>
 
@@ -53,7 +53,8 @@ time; without it the board simply has no whiteboard button.
 Links work in plan text and in both user and agent discussion messages, including
 plain URLs and Markdown links. Link to a section, item, or diagram with its stable
 ID, such as `#breaking` or `http://localhost:4747/boards/<key>#breaking`. Opening
-a board link reveals a collapsed target and opens its discussion.
+a board link reveals a collapsed target. Section links scroll to the section;
+item and diagram links also open their discussion.
 
 Run `planboard init` to create `.planboard/PLAN.md` at the repository root, even
 from a subdirectory. Outside Git, it uses `.planboard/PLAN.md` in the current
@@ -99,6 +100,39 @@ Plain bullets without a checkbox are notes, not tracked items. Raw HTML/SVG pass
 `planboard lint PLAN.md` reports items without ids and duplicate ids; `planboard init` scaffolds
 a plan with the conventions in a comment.
 
+## Golden plan structure
+
+`planboard init` creates a predictable ten-section record: Description; Requirements and
+scope; Architecture; Decisions and questions; Risks and dependencies; Implementation;
+Apply and verify; Results and evidence; Handoff and ownership; Timeline. The outline
+organizes these as Understand, Decide, Deliver and Continue. Existing plans retain their
+headings and anchors; they do not need conversion to use the continuous reader.
+
+Write facts and requirements as prose, choices as comparison tables, and history as dated
+events. Only executable work receives task checkboxes. Use `[?]` for an unresolved
+question; after answering, keep its ID in a plain entry with the decision and source.
+An option that was not chosen is not completed work. Record implementation, application
+and acceptance evidence separately, with owners and the actual observation date.
+
+The **Now** strip links to three canonical plain list entries: `{#now-outcome}` and
+`{#now-verified}` in Results, and `{#now-next}` in Handoff. Write the next action and owner
+in that last entry. Open questions supply the input field. Nothing is inferred from
+file modification times or checkbox completion. Older plans without these entries show
+no Now strip. See [the fictional golden-plan example](examples/golden-plan.md).
+
+Keep explanations, current choices, actions and results visible. Optional supporting
+material can use ordinary Markdown inside native HTML details, with blank lines around
+the Markdown body and a stable HTML ID for saved expansion state:
+
+```markdown
+<details id="supporting-evidence">
+<summary>Supporting evidence</summary>
+
+Logs, earlier alternatives, or source details go here.
+
+</details>
+```
+
 ## The loop
 
 Planboard agents modify files by default. They must not create commits, create
@@ -120,11 +154,16 @@ read the reply next to the item      planboard poll PLAN.md …
   and shows progress and section discussion counts. Contents numbers follow the
   Markdown heading order automatically: `1`, `1.1`, `1.1.1`. The document title
   is unnumbered. Use `##` for main sections and `###` for subsections; keep sections
-  in their intended order and do not type numbers into heading titles. Each second-level section has
-  independently expandable **Solution details** and **Tasks**; opening another section’s
-  details closes the previous one. **Expand all / Collapse all** controls the full outline.
-  **Discuss this section** opens its attached conversation. Expansion choices are saved
-  per board, and selecting a hidden item reveals its containing group.
+  in their intended order and do not type numbers into heading titles. All main content
+  stays visible on one continuous page. The outline highlights your reading position;
+  clicking it scrolls to a section without opening the discussion. On phones, a compact
+  section selector replaces the outline. **Expand all** opens author-written supporting
+  disclosures; **Collapse details** closes only those disclosures. Multiple disclosures
+  can stay open. Detail state and reading position are saved per board; the top-bar plan
+  switcher carries the current section to another open plan when its anchor exists.
+  **Discuss this section** opens its attached conversation. Selecting a hidden target
+  reveals its containing details. Section progress counts actions only, excluding
+  questions and cancelled work; it does not imply deployed or accepted results.
   Items with notes carry a count badge (dashed = not sent yet, filled = waiting for the agent,
   green = agent answered last, 📎 = attachments). Items that changed since your last visit get a
   coloured left rail and a tag drawing the move (old-status dot → new-status dot). The thin
@@ -135,9 +174,9 @@ read the reply next to the item      planboard poll PLAN.md …
   day separators; **Changes** is the review view (below).
 - **Composer**: Enter adds a note (it stays "not sent" until you press **Send**, so you can walk
   the whole plan first); ⌘/Ctrl+Enter adds and sends; Esc goes back to the whole plan. You can
-  also flip an item's status yourself from the panel. Paste or drop a
+  also flip an action's status yourself from the panel; answer questions in a note. Paste or drop a
   screenshot (or use 📎) to attach it: it is stored beside the plan and shown in the thread.
-- **Top bar**: the stacked status bar, the changes chip, **Export**, and agent presence - *no agent
+- **Top bar**: open-plan switching, question/blocker counts, the changes chip, **Export**, and agent presence - *no agent
   listening*, *agent is listening* (a poll is attached), *agent is working on your notes*
   (delivered, no reply yet). The listening agent's `--owner` label is shown next to it, so you can
   see which model and effort level will read your notes: that is decided by the agent session that
@@ -149,7 +188,7 @@ read the reply next to the item      planboard poll PLAN.md …
 
 ### Reviewing what changed
 
-![the Changes tab: status flow, timeline, section deltas and change cards](docs/changes.jpg)
+![the Changes tab beside implementation progress: status flow, timeline, section deltas, and change cards](docs/changes.jpg)
 
 The **Changes** tab is drawn, not listed, so a morning catch-up is a glance:
 
