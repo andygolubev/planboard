@@ -9,12 +9,12 @@ that item - through a long poll, edits the plan, flips statuses as work lands, a
 next to the item. Notes, replies and the status history persist beside the plan, so the same
 board serves the whole project day after day. The plan is the conversation; the chat log is not.
 
-![planboard in light theme: numbered contents, expandable tasks, and an item discussion](docs/board.jpg)
+![planboard in light theme: the golden plan outline, Now summary, continuous sections, and a section discussion](docs/board.jpg)
 
 <details>
 <summary>See the dark theme</summary>
 
-![planboard in dark theme with the moonlit alpine background](docs/board-dark.jpg)
+![planboard in dark theme: architecture, supporting details, and decision options on one continuous page](docs/board-dark.jpg)
 
 </details>
 
@@ -188,7 +188,7 @@ read the reply next to the item      planboard poll PLAN.md …
 
 ### Reviewing what changed
 
-![the Changes tab: status flow, timeline, section deltas and change cards](docs/changes.jpg)
+![the Changes tab beside implementation progress: status flow, timeline, section deltas, and change cards](docs/changes.jpg)
 
 The **Changes** tab is drawn, not listed, so a morning catch-up is a glance:
 
