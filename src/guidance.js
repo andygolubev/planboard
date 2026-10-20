@@ -2,6 +2,67 @@
 // installable skills point here for the command contract, with harness-specific
 // polling guidance where needed.
 
+export const PLAN_STRUCTURE = `Golden plan structure
+  Keep one current record, with these ## sections in order for new plans:
+  1. Description {#description}: what the task is, why it matters, and the source
+     of the request. Distinguish user instructions from attached source material.
+  2. Requirements and scope {#requirements}: observable outcomes, acceptance
+     criteria, constraints, and explicit exclusions. Requirements are prose.
+  3. Architecture {#architecture}: the current design and rationale. Use a diagram
+     only when it clarifies the design; keep old designs in supporting details.
+  4. Decisions and questions {#decisions}: what must be decided, by whom, why,
+     and which action depends on it. Compare options in a table on the same
+     dimensions. Label recommendations; record the selected option, actor, date,
+     rationale and source. Options are not tasks. Unchosen does not mean done.
+  5. Risks and dependencies {#risks}: consequence, owner, mitigation and affected
+     work; link related plans. Recheck assumptions when a dependency changes.
+  6. Implementation {#implementation}: concrete actions with owner, completion
+     condition and evidence. Use plain subheadings for phases, checkboxes for
+     executable actions; do not count both a parent summary and its child tasks.
+  7. Apply and verify {#apply}: version, target or rollout wave, prerequisites,
+     operator, apply result, verification, stop conditions and recovery. Keep
+     building, merging, applying and observed success distinct.
+  8. Results and evidence {#results}: criterion, observed result, source, revision
+     or environment, and observation date. Say what remains unverified.
+  9. Handoff and ownership {#handoff}: next action, owner, waiting condition and
+     enough context to resume. Use Unassigned when ownership is unknown.
+  10. Timeline {#timeline}: creation, iterations, scope/design decisions,
+      meaningful failures, milestones and handoffs with original dates/sources.
+      Preserve date-only precision and include a zone for times. Do not invent
+      missing history or treat the date a file was opened as verification.
+  Keep non-applicable sections brief and explain why; do not invent work, gates
+  or deployment steps to fill them. Existing plans remain valid. When migrating,
+  retain existing item/heading IDs and their threads, preserve source order within
+  sections, and record the restructuring in Timeline. Never silently reinterpret
+  an ambiguous historical status.
+
+  Use paragraphs, plain bullets and tables for facts, requirements, assumptions,
+  decisions, options, evidence and history. Only actions use [ ], [~], [!], [x]
+  or [-]. [?] is an unresolved question, shown separately from action progress.
+  When answered, preserve its ID in a plain entry recording the answer and source;
+  use plain text for Deferred or Superseded. Do not mark an option [x] to mean
+  selected. Cancelled or transferred work is not completed work; retain the
+  reason and destination. Questions and cancelled work do not enter progress.
+  A done action needs its completion condition verified, with evidence referenced;
+  implementation progress is separate from application and acceptance.
+
+  The page is continuous: main explanations, actions, choices and results stay
+  visible. Put only supporting context, logs or superseded alternatives inside
+  native <details id="stable-detail-id"><summary>Specific label</summary> blocks,
+  with blank lines around the Markdown body. Expand all opens all such blocks;
+  Collapse details leaves the primary content visible. Opening one disclosure
+  does not close another. Avoid hiding entire sections or nesting many folders.
+
+  The Now strip reads canonical plain list entries by stable ID: {#now-outcome}
+  in Results for the latest known outcome, {#now-verified} there for its last
+  verified date/source (or Not yet verified), and {#now-next} in Handoff for the
+  next action and owner. Keep these short; link their evidence or action. Open
+  [?] questions supply Needs your input. Do not maintain a duplicate Now section.
+  On resume or closeout, reconcile current scope, choices, diagrams, work states,
+  evidence and handoff; add significant changes to Timeline. Existing authorization
+  persists: optional questions do not block unrelated authorized work, and silence
+  never establishes a decision or approval.`;
+
 export const CONVENTIONS = `PLAN.md conventions
   - Headings are sections. Items are Markdown list items. Both may end with {#id}
     (letters, digits, - _ . :). Ids are the anchors that threads and the status
@@ -19,7 +80,9 @@ export const CONVENTIONS = `PLAN.md conventions
     in the intended reading/execution order. Reorder only when requested or needed
     by the change. Contents numbering is automatic; do not number heading text
     manually or rename stable {#id} anchors.
-  - Everything else is ordinary Markdown; raw HTML/SVG passes through.`;
+  - Everything else is ordinary Markdown; raw HTML/SVG passes through.
+
+${PLAN_STRUCTURE}`;
 
 export const DEPTH_GUIDE = `Note depth (the user picks it per note: quick · normal · deep)
   quick   answer from what you already know in one or two sentences; only trivial
@@ -271,41 +334,75 @@ export function feedbackNextStep(planPath, notes) {
   );
 }
 
-export const PLAN_TEMPLATE = (title) => `---
+export const PLAN_TEMPLATE = (title, createdAt = new Date().toISOString()) => `---
 title: ${title}
 ---
 
 # ${title} {#plan}
 
-Goal: one paragraph on what this plan achieves and how you will know it is done.
+## Description {#description}
 
-## Context {#context}
+Describe the task, why it matters, and who requested it. Link the original request.
 
-- Current state, constraints, and the decision that started this work.
+## Requirements and scope {#requirements}
 
-## Milestone 1 {#m1}
+Define observable success, constraints, and what is outside this task.
 
-- [ ] First concrete, verifiable item {#m1-first}
-- [ ] Second item {#m1-second}
-  - [ ] Sub-item, if the parent needs breaking down {#m1-second-a}
-- [?] Something the user must decide {#m1-decide}
+## Architecture {#architecture}
 
-## Architecture {#arch}
+Describe the current design and its rationale, or explain why no design is needed.
 
-\`\`\`mermaid arch
-flowchart LR
-  A[Component A] --> B[Component B]
-  B --> C[(Store)]
-\`\`\`
+<details id="architecture-context">
+<summary>Supporting design context</summary>
 
-## Risks and open questions {#risks}
+Keep reference material and earlier alternatives here; keep the current design above.
 
-- [!] A known blocker, with who or what unblocks it {#risk-1}
+</details>
+
+## Decisions and questions {#decisions}
+
+No open questions recorded. Add only actual questions, with respondent and affected work.
+
+<!-- For an open choice, use [?] with a stable ID and a table of comparable options.
+Record the eventual selection, actor, date and source as plain text with the same ID. -->
+
+## Risks and dependencies {#risks}
+
+Not yet assessed. Record concrete consequences, owners, mitigations and related tasks.
+
+## Implementation {#implementation}
+
+No implementation actions defined. Add concrete actions with owners and completion conditions.
+
+<!-- Only executable actions get checkboxes. Keep phase headings and requirements as prose. -->
+
+## Apply and verify {#apply}
+
+Application scope not yet defined. For analysis-only work, state that no change is being applied.
+
+## Results and evidence {#results}
+
+- No outcome verified yet. {#now-outcome}
+- Not yet verified; no observation date recorded. {#now-verified}
+
+<!-- Add criterion, observed result, environment/revision, evidence link and observation date. -->
+
+## Handoff and ownership {#handoff}
+
+- Unassigned — define the desired outcome and first verifiable action. {#now-next}
+
+## Timeline {#timeline}
+
+| When | Event | Source |
+| --- | --- | --- |
+| ${createdAt} | Plan created; scope awaits definition. | planboard init |
 
 <!--
-Conventions: [ ] todo · [~] in progress · [x] done · [!] blocked · [?] decision · [-] dropped.
-Every item and heading ends with {#id}; ids never change once discussed.
-Run: planboard <path-to-this-file>  (open)   planboard poll <path-to-this-file>  (wait for notes)
+[ ] todo · [~] in progress · [x] verified action done · [!] blocked · [?] open question · [-] cancelled.
+Facts, requirements, options and history have no execution status.
+Headings and list items use stable {#id} anchors; preserve IDs when editing.
+The Now strip derives from now-outcome, now-verified, now-next and open questions.
+Run: planboard <path-to-this-file> (open) · planboard poll <path-to-this-file> (notes)
 -->
 `;
 
@@ -339,6 +436,8 @@ and do not push changes, unless the user explicitly asks for that Git action.
 A plan item, review note, or completed implementation is not permission to commit
 or create a branch. Leave Git actions to the user unless explicitly requested.
 
+${PLAN_STRUCTURE}
+
 Use the planboard skill for the full review loop. Poll with
 \`planboard poll PLAN.md --timeout 30 --owner "Cursor"\` in the foreground, shortening
 the timeout if needed to fit the terminal tool's limit. Collect any tracked command's
@@ -365,6 +464,8 @@ parent; do not skip heading levels. Insert new sections under the correct parent
 at the appropriate position. Do not reorder existing sections unless the user
 asks or the change requires it. Contents numbering is automatic (1, 1.1, 1.1.1);
 do not type numeric prefixes into headings or change stable {#id} anchors.
+
+${PLAN_STRUCTURE}
 Run \`planboard --help\` for the conventions and the loop; \`planboard show PLAN.md\` shows the
 plan with ids and note counts; \`planboard poll PLAN.md --owner "<model>, effort <level>"\`
 waits for the user's notes; answer with \`planboard reply\`, flip statuses with \`planboard set\`;
@@ -403,6 +504,8 @@ parent; do not skip heading levels. Insert new sections under the correct parent
 at the appropriate position. Do not reorder existing sections unless the user
 asks or the change requires it. Contents numbering is automatic (1, 1.1, 1.1.1);
 do not type numeric prefixes into headings or change stable {#id} anchors.
+
+${PLAN_STRUCTURE}
 
 Open with \`planboard PLAN.md\`. If browser launch is unavailable, use
 \`planboard PLAN.md --no-open\` and give the user the printed URL. The daemon and

@@ -66,7 +66,6 @@ try {
   await page.goto(board.url);
   await page.locator('[data-resize-panel="right"]').focus();
   for (let i = 0; i < 9; i++) await page.keyboard.press("ArrowLeft");
-  await page.locator('.section-disclosure[data-kind="tasks"] > summary').click();
   await page.locator('[data-item="legacy"] .wf-badge').getByText("Not validated", { exact: true }).waitFor();
   await tab("Requirements");
   await page.getByLabel("Requirement", { exact: true }).selectOption("REQ-1");

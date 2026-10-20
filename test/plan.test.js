@@ -87,7 +87,7 @@ test("rendered HTML carries the anchors the browser needs", () => {
   const m = parsePlan(SAMPLE);
   assert.match(m.html, /<li class="item status-done" data-item="p1-login" data-status="done" data-line="11">/);
   assert.match(m.html, /<h2 class="section-head" id="sec-p1" data-section="p1"/);
-  assert.match(m.html, /1\/7<\/span><\/h2>/);
+  assert.match(m.html, /1\/5 actions<\/span><span class="sec-questions">1 to decide<\/span><\/h2>/);
   assert.doesNotMatch(m.html, /\{#/, "ids are stripped from the visible text");
   assert.doesNotMatch(m.html, /\[x\]|\[~\]/, "task markers are stripped from the visible text");
   assert.match(m.html, /<p class="block" data-block="7" data-section-of="plan">Goal paragraph\.<\/p>/);

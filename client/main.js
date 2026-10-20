@@ -4,10 +4,10 @@
 import mermaid from "mermaid";
 
 import { renderChangesPanel, changeGroups } from "./changes.js";
-import { STATUS_ORDER, ago, anchorKeyOf, clock, cssEscape, dayLabel, describeEvent as describeEv, esc, eventKey, fileSize } from "./util.js";
+import { ago, anchorKeyOf, clock, cssEscape, dayLabel, describeEvent as describeEv, esc, eventKey, fileSize } from "./util.js";
 import { createWhiteboardHost } from "./whiteboard.js";
 import { createDiagramViewer } from "./diagram-viewer.js";
-import { numberedSections } from "./outline.js";
+import { createPlanReader, renderNow } from "./reader.js";
 import { setupPanelResize } from "./resize.js";
 import { anchorForHash, samePageHash } from "./links.js";
 import { acceptanceBadge, createWorkflowHost, WORKFLOW_TABS } from "./workflow.js";
@@ -22,6 +22,7 @@ const $ = (sel, root = document) => root.querySelector(sel);
 const boardEl = $("#board");
 const rulerEl = $("#ruler");
 const toolbarEl = $("#toolbar");
+const expandBtn = $("#expandBtn");
 const collapseBtn = $("#collapseBtn");
 const panelEl = $("#panel");
 const panelScroll = $("#panelScroll");
@@ -54,8 +55,11 @@ let tempPin = null;
 let pendingFiles = [];
 const review = { index: -1 };
 const beforeMode = new Set();
-const expanded = new Set(loadJson("sectionDetails", []));
-const taskExpanded = new Set(loadJson("sectionTasks", []));
+const reader = createPlanReader({
+  board: boardEl, contents: $("#contentsLinks"), mobile: $("#sectionSelect"),
+  toolbar: toolbarEl, expand: expandBtn, collapse: collapseBtn,
+  getState: () => state, load: loadJson, save: saveJson, onLayout: () => renderRuler(),
+});
 const workflow = createWorkflowHost({ api, base: API, getState: () => state, getSince: () => since, notify: (message) => toast(message), onRefresh: async () => {
   if (await refreshState()) { paint(); renderTopbar(); renderPanel(); }
 } });
@@ -164,23 +168,26 @@ const isPhone = () => window.matchMedia("(max-width: 900px)").matches;
 // ---------------------------------------------------------------- board
 
 function renderBoard() {
-  const scroll = boardEl.scrollTop;
+  const position = renderedBoardHTML === null ? undefined : reader.position();
   if (state.error) {
     boardEl.innerHTML = `<div class="board-error"><h2>Cannot show the plan</h2><p>${esc(state.error)}</p><p class="muted">${esc(state.path)}</p></div>`;
     return;
   }
   boardEl.innerHTML = `<article class="plan">${state.html}</article>`;
+  const plan = boardEl.querySelector(".plan");
+  const title = plan.querySelector('h1.section-head');
+  if (title) title.insertAdjacentHTML("afterend", renderNow(state.items));
+  else plan.insertAdjacentHTML("afterbegin", renderNow(state.items));
   renderedBoardHTML = state.html;
-  boardEl.scrollTop = scroll;
-  buildOutline();
+  reader.mount(plan, position);
   renderDiagrams();
   paint();
 }
 
-// Decorations, collapse and the ruler always go together.
+// Decorations, reading outline and the ruler always go together.
 function paint() {
   decorateBoard();
-  applyCollapse();
+  reader.render();
   renderRuler();
   renderSheetHandle();
 }
@@ -392,112 +399,6 @@ function decorateBoard() {
   }
 }
 
-// ---- section outline and progressive disclosure --------------------------------
-function buildOutline() {
-  const plan = boardEl.querySelector(".plan");
-  const nodes = [...plan.children];
-  let card = null;
-  let content = [];
-  function finish() {
-    if (!card) return;
-    const id = card.dataset.outline;
-    const summary = content[0]?.matches("p") ? content.shift() : null;
-    if (summary) { summary.classList.add("section-summary"); card.append(summary); }
-    const taskLists = content.filter(el => el.matches("ul, ol") && el.querySelector('li.item:not([data-status="none"])'));
-    const tasks = content.filter((el, index) => taskLists.includes(el) || (el.matches(".section-head") && taskLists.includes(content[index + 1])));
-    const details = content.filter(el => !tasks.includes(el));
-    for (const [kind, elements, label] of [["details", details, "Solution details"], ["tasks", tasks, "Tasks"]]) {
-      if (!elements.length) continue;
-      const group = document.createElement("details");
-      group.className = "section-disclosure";
-      group.dataset.kind = kind;
-      group.dataset.owner = id;
-      const heading = document.createElement("summary");
-      heading.textContent = label;
-      const body = document.createElement("div");
-      body.className = "disclosure-body";
-      body.append(...elements);
-      group.append(heading, body);
-      group.open = (kind === "tasks" ? taskExpanded : expanded).has(id);
-      group.addEventListener("toggle", () => {
-        const ids = kind === "tasks" ? taskExpanded : expanded;
-        if (group.open) ids.add(id); else ids.delete(id);
-        saveJson(kind === "tasks" ? "sectionTasks" : "sectionDetails", [...ids]);
-        updateOutlineControls();
-        renderRuler();
-      });
-      card.append(group);
-    }
-    const thoughts = document.createElement("button");
-    thoughts.type = "button";
-    thoughts.className = "section-thoughts";
-    thoughts.dataset.thoughts = id;
-    card.append(thoughts);
-  }
-  for (const el of nodes) {
-    if (el.matches(".section-head") && Number(el.dataset.level) === 2) {
-      finish();
-      card = document.createElement("section");
-      card.className = "plan-section";
-      card.dataset.outline = el.dataset.section;
-      el.before(card);
-      card.append(el);
-      content = [];
-    } else if (card) content.push(el);
-  }
-  finish();
-}
-
-function updateOutlineControls() {
-  const groups = [...boardEl.querySelectorAll(".section-disclosure")];
-  toolbarEl.hidden = !groups.length;
-  collapseBtn.textContent = groups.length && groups.every(el => el.open) ? "Collapse all" : "Expand all";
-  collapseBtn.dataset.mode = groups.every(el => el.open) ? "collapse" : "expand";
-}
-
-function applyCollapse() {
-  $("#contentsLinks").innerHTML = numberedSections(state.sections || []).map(section => {
-    const id = section.id;
-    const thread = state.threads?.[`section:${id}`];
-    const counts = section?.counts;
-    const active = selection.type === "section" && selection.section === id;
-    return `<button type="button" class="contents-link${active ? " active" : ""}" data-jump-section="${esc(id)}" style="--indent:${section.depth}" ${active ? 'aria-current="location"' : ''}><span>${section.number ? `<span class="contents-number">${section.number}</span> ` : ""}${esc(section.displayTitle)}</span><small>${counts?.total ? `${counts.done}/${counts.total}` : ""}${thread ? ` · ${thread.count} thought${thread.count === 1 ? "" : "s"}${thread.last_from === "agent" ? " · reply" : ""}` : ""}</small></button>`;
-  }).join("");
-  for (const button of boardEl.querySelectorAll("[data-thoughts]")) {
-    const thread = state.threads?.[`section:${button.dataset.thoughts}`];
-    button.textContent = thread ? `${thread.count} thought${thread.count === 1 ? "" : "s"}${thread.last_from === "agent" ? " · Agent replied" : ""}` : "Discuss this section";
-  }
-  for (const group of boardEl.querySelectorAll('.section-disclosure[data-kind="tasks"]')) {
-    const items = [...group.querySelectorAll('li.item:not([data-status="none"])')];
-    group.querySelector("summary").textContent = `Tasks · ${items.filter(el => el.dataset.status === "done").length}/${items.length} done`;
-  }
-  updateOutlineControls();
-}
-
-boardEl.addEventListener("click", ev => {
-  const summary = ev.target.closest(".section-disclosure > summary");
-  if (!summary) return;
-  const group = summary.parentElement;
-  if (!group.open && group.dataset.kind === "details") {
-    for (const other of boardEl.querySelectorAll('.section-disclosure[data-kind="details"]')) {
-      if (other !== group) other.open = false;
-    }
-  }
-});
-
-$("#contentsLinks").addEventListener("click", ev => {
-  const button = ev.target.closest("[data-jump-section]");
-  if (!button) return;
-  select({ type: "section", section: button.dataset.jumpSection }, { focus: false, scrollTo: true });
-});
-
-collapseBtn.addEventListener("click", () => {
-  const open = collapseBtn.dataset.mode === "expand";
-  for (const group of boardEl.querySelectorAll(".section-disclosure")) group.open = open;
-  updateOutlineControls();
-  renderRuler();
-});
-
 // ---- ruler: where the changes and notes are along the whole plan -----------------------
 
 function renderRuler() {
@@ -507,7 +408,7 @@ function renderRuler() {
   const changes = eventsByTarget();
   const marks = [];
   for (const el of boardEl.querySelectorAll("li.item.changed, figure.diagram.changed, li.item.has-notes, figure.diagram.has-notes, .section-head.has-notes")) {
-    if (!el.getClientRects().length) continue;
+    if (el.closest("details:not([open])") || !el.getClientRects().length) continue;
     const y = el.getBoundingClientRect().top - top0 + boardEl.scrollTop;
     const key = el.dataset.item ? `item:${el.dataset.item}` : el.dataset.diagram ? `diagram:${el.dataset.diagram}` : `section:${el.dataset.section}`;
     const evs = changes.get(key);
@@ -587,7 +488,7 @@ function select(anchor, { focus = true, scrollTo = false } = {}) {
   renderPanel();
   if (scrollTo) {
     const el = elementForAnchor(selection);
-    if (el) el.scrollIntoView({ block: "center", behavior: "smooth" });
+    if (el) el.scrollIntoView({ block: "center", behavior: matchMedia("(prefers-reduced-motion: reduce)").matches ? "instant" : "smooth" });
   }
   if (isPhone() && selection.type !== "board") openSheet(true);
   // on a phone the sheet opens on the thread; the keyboard should not pop up until the user taps the box
@@ -599,7 +500,7 @@ function revealAnchor(a) {
   const el = elementForAnchor(a);
   if (!el) return;
   for (let parent = el.parentElement; parent && parent !== boardEl; parent = parent.parentElement) {
-    if (parent.matches("details.section-disclosure")) parent.open = true;
+    if (parent.matches("details")) parent.open = true;
   }
 }
 
@@ -648,7 +549,7 @@ function anchorFromKey(key) {
 boardEl.addEventListener("click", (ev) => {
   const t = ev.target;
   if (!(t instanceof Element)) return;
-  if (t.closest(".section-disclosure > summary")) return;
+  if (t.closest("summary")) return;
   const thoughts = t.closest("[data-thoughts]");
   if (thoughts) {
     select({ type: "section", section: thoughts.dataset.thoughts });
@@ -797,7 +698,7 @@ function toggleBefore(did) {
 // ---------------------------------------------------------------- keyboard
 
 function visibleItems() {
-  return [...boardEl.querySelectorAll('li.item:not([data-status="none"])')].filter((el) => el.getClientRects().length);
+  return [...boardEl.querySelectorAll('li.item:not([data-status="none"])')].filter((el) => !el.closest("details:not([open])") && el.getClientRects().length);
 }
 
 function moveItem(delta) {
@@ -808,7 +709,7 @@ function moveItem(delta) {
   let next = cur < 0 ? (delta > 0 ? 0 : items.length - 1) : Math.min(items.length - 1, Math.max(0, cur + delta));
   const el = items[next];
   select({ type: "item", item: el.dataset.item }, { focus: false });
-  el.scrollIntoView({ block: "nearest", behavior: "smooth" });
+  el.scrollIntoView({ block: "nearest", behavior: matchMedia("(prefers-reduced-motion: reduce)").matches ? "instant" : "smooth" });
 }
 
 function isTyping(el) {
@@ -966,8 +867,9 @@ function renderContext() {
       const evs = (state.events_since || []).filter((e) => e.item === it.id && e.type === "status");
       const moved = evs.length ? `<span class="ctx-moved" title="${esc(evs.map((e) => `${describeEvent(e)} · ${clock(e.at)}`).join("\n"))}"><i class="dot-s st-${esc(evs[0].from || "none")}"></i>→<i class="dot-s st-${esc(evs[evs.length - 1].to || "none")}"></i> ${esc(ago(evs[evs.length - 1].at))}</span>` : "";
       parts.push(
-        `<div class="ctx-meta"><span class="status-pill status-${it.status || "none"}">${esc(statusLabel(it.status))}</span>` +
-          (it.status ? `<label class="ctx-set">set <select id="ctxStatus">${opts}</select></label>` : "") +
+        `<div class="ctx-meta">${it.status ? `<span class="status-pill status-${it.status}">${esc(statusLabel(it.status))}</span>` : ""}` +
+          (it.status && it.status !== "question" ? `<label class="ctx-set">set <select id="ctxStatus">${opts}</select></label>` : "") +
+          (it.status === "question" ? '<span class="muted">Record your answer in a note.</span>' : "") +
           moved +
           `<span class="muted">line ${it.line}</span></div>`,
       );
@@ -1283,18 +1185,12 @@ composerText.addEventListener("keydown", (ev) => {
 
 function renderTopbar() {
   $("#boardTitle").textContent = state.title;
+  const currentOption = $("#boardSwitcher").querySelector(`option[value="${KEY}"]`);
+  if (currentOption) currentOption.textContent = state.title;
   document.title = `${state.title} · planboard`;
-  const c = state.counts;
-  if (c && c.total) {
-    const parts = [`${c.done}/${c.total} done`];
-    if (c.in_progress) parts.push(`${c.in_progress} in progress`);
-    if (c.blocked) parts.push(`${c.blocked} blocked`);
-    if (c.question) parts.push(`${c.question} to decide`);
-    const segs = STATUS_ORDER.filter((s) => c[s])
-      .map((s) => `<i class="seg seg-${s}" style="width:${(100 * c[s]) / c.total}%" title="${c[s]} ${esc(statusLabel(s))}"></i>`)
-      .join("");
-    progressEl.innerHTML = `<span class="bar stacked" title="${esc(parts.join(" · "))}">${segs}</span><span class="progress-text">${esc(parts.join(" · "))}</span>`;
-  } else progressEl.innerHTML = `<span class="muted">no tracked items yet</span>`;
+  const c = state.counts || {};
+  const attention = [c.question ? `${c.question} to decide` : "", c.blocked ? `${c.blocked} blocked` : ""].filter(Boolean);
+  progressEl.innerHTML = attention.length ? `<span class="progress-text">${esc(attention.join(" · "))}</span>` : "";
   const n = (state.events_since || []).length;
   if (n) {
     changesChip.hidden = false;
@@ -1503,7 +1399,8 @@ setInterval(() => {
 function followHash() {
   const anchor = anchorForHash(location.hash, state);
   if (!anchor) return;
-  select(anchor, { focus: false, scrollTo: true });
+  if (anchor.type === "section") reader.jump(anchor.section, { history: false });
+  else select(anchor, { focus: false, scrollTo: true });
 }
 document.addEventListener("click", event => {
   if (event.defaultPrevented || event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
@@ -1521,8 +1418,31 @@ window.addEventListener("popstate", followHash);
 
 window.addEventListener("planboard:themechange", () => renderDiagrams());
 
+async function renderBoardSwitcher() {
+  try {
+    const response = await fetch("/api/boards");
+    if (!response.ok) return;
+    const { boards } = await response.json();
+    const switcher = $("#boardSwitcher");
+    switcher.innerHTML = boards.map(board => `<option value="${esc(board.key)}">${esc(board.title)}</option>`).join("");
+    switcher.value = KEY;
+    switcher.hidden = boards.length < 2;
+    $("#boardTitle").hidden = boards.length > 1;
+  } catch { /* The current board remains usable when the server is offline. */ }
+}
+$("#boardSwitcher").addEventListener("change", event => {
+  const key = event.target.value;
+  if (!/^[a-f0-9]{12}$/.test(key) || key === KEY) return;
+  const section = reader.mainSection();
+  location.href = `/boards/${key}${section ? `#sec-${encodeURIComponent(section)}` : ""}`;
+});
+document.addEventListener("visibilitychange", () => {
+  if (document.visibilityState === "visible") renderBoardSwitcher();
+});
+
 renderBoard();
 renderTopbar();
+renderBoardSwitcher();
 renderPanel();
 followHash();
 connect();

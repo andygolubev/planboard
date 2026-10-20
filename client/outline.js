@@ -16,3 +16,16 @@ export function numberedSections(sections) {
     return { ...section, number, depth, displayTitle };
   });
 }
+
+// Use the heading nearest the reading edge, including the final short section
+// when the reader reaches the bottom of a long document.
+export function readingSection(headings, { top, height, scrollTop, scrollHeight }) {
+  if (!headings.length) return null;
+  if (scrollTop > 0 && scrollHeight > height + 2 && scrollTop + height >= scrollHeight - 2) return headings.at(-1).id;
+  let current = headings[0].id;
+  for (const heading of headings) {
+    if (heading.top > top + 32) break;
+    current = heading.id;
+  }
+  return current;
+}

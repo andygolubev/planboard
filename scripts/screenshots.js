@@ -45,7 +45,6 @@ try {
   const errors = [];
   page.on("pageerror", (error) => errors.push(error.message));
   await page.goto(board.url);
-  await page.locator('.section-disclosure[data-owner="site"][data-kind="tasks"] > summary').click();
   await page.locator('[data-item="site-soil"]').waitFor();
   await page.locator('figure.diagram svg').waitFor({ state: "attached" });
   // Give the review panel enough room for both the conversation and change flow.

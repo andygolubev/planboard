@@ -26,6 +26,67 @@ at the appropriate position. Do not reorder existing sections unless the user
 asks or the change requires it. Contents numbering is automatic (1, 1.1, 1.1.1);
 do not type numeric prefixes into headings or change stable {#id} anchors.
 
+Golden plan structure
+  Keep one current record, with these ## sections in order for new plans:
+  1. Description {#description}: what the task is, why it matters, and the source
+     of the request. Distinguish user instructions from attached source material.
+  2. Requirements and scope {#requirements}: observable outcomes, acceptance
+     criteria, constraints, and explicit exclusions. Requirements are prose.
+  3. Architecture {#architecture}: the current design and rationale. Use a diagram
+     only when it clarifies the design; keep old designs in supporting details.
+  4. Decisions and questions {#decisions}: what must be decided, by whom, why,
+     and which action depends on it. Compare options in a table on the same
+     dimensions. Label recommendations; record the selected option, actor, date,
+     rationale and source. Options are not tasks. Unchosen does not mean done.
+  5. Risks and dependencies {#risks}: consequence, owner, mitigation and affected
+     work; link related plans. Recheck assumptions when a dependency changes.
+  6. Implementation {#implementation}: concrete actions with owner, completion
+     condition and evidence. Use plain subheadings for phases, checkboxes for
+     executable actions; do not count both a parent summary and its child tasks.
+  7. Apply and verify {#apply}: version, target or rollout wave, prerequisites,
+     operator, apply result, verification, stop conditions and recovery. Keep
+     building, merging, applying and observed success distinct.
+  8. Results and evidence {#results}: criterion, observed result, source, revision
+     or environment, and observation date. Say what remains unverified.
+  9. Handoff and ownership {#handoff}: next action, owner, waiting condition and
+     enough context to resume. Use Unassigned when ownership is unknown.
+  10. Timeline {#timeline}: creation, iterations, scope/design decisions,
+      meaningful failures, milestones and handoffs with original dates/sources.
+      Preserve date-only precision and include a zone for times. Do not invent
+      missing history or treat the date a file was opened as verification.
+  Keep non-applicable sections brief and explain why; do not invent work, gates
+  or deployment steps to fill them. Existing plans remain valid. When migrating,
+  retain existing item/heading IDs and their threads, preserve source order within
+  sections, and record the restructuring in Timeline. Never silently reinterpret
+  an ambiguous historical status.
+
+  Use paragraphs, plain bullets and tables for facts, requirements, assumptions,
+  decisions, options, evidence and history. Only actions use [ ], [~], [!], [x]
+  or [-]. [?] is an unresolved question, shown separately from action progress.
+  When answered, preserve its ID in a plain entry recording the answer and source;
+  use plain text for Deferred or Superseded. Do not mark an option [x] to mean
+  selected. Cancelled or transferred work is not completed work; retain the
+  reason and destination. Questions and cancelled work do not enter progress.
+  A done action needs its completion condition verified, with evidence referenced;
+  implementation progress is separate from application and acceptance.
+
+  The page is continuous: main explanations, actions, choices and results stay
+  visible. Put only supporting context, logs or superseded alternatives inside
+  native <details id="stable-detail-id"><summary>Specific label</summary> blocks,
+  with blank lines around the Markdown body. Expand all opens all such blocks;
+  Collapse details leaves the primary content visible. Opening one disclosure
+  does not close another. Avoid hiding entire sections or nesting many folders.
+
+  The Now strip reads canonical plain list entries by stable ID: {#now-outcome}
+  in Results for the latest known outcome, {#now-verified} there for its last
+  verified date/source (or Not yet verified), and {#now-next} in Handoff for the
+  next action and owner. Keep these short; link their evidence or action. Open
+  [?] questions supply Needs your input. Do not maintain a duplicate Now section.
+  On resume or closeout, reconcile current scope, choices, diagrams, work states,
+  evidence and handoff; add significant changes to Timeline. Existing authorization
+  persists: optional questions do not block unrelated authorized work, and silence
+  never establishes a decision or approval.
+
 Open with `planboard PLAN.md`. If browser launch is unavailable, use
 `planboard PLAN.md --no-open` and give the user the printed URL. The daemon and
 browser must be able to reach each other; follow the environment's permissions

@@ -9,6 +9,7 @@
 // Everything else renders as the Markdown it is; raw HTML/SVG passes through.
 
 import MarkdownIt from "markdown-it";
+import { executionCounts } from "./progress.js";
 
 export const STATUS_BY_CHAR = {
   " ": "todo",
@@ -344,29 +345,29 @@ function installRules(md, env) {
   rules.heading_open = (tokens, idx, options, _env, self) => {
     const s = tokens[idx].meta && tokens[idx].meta.section;
     if (!s) return self.renderToken(tokens, idx, options);
-    const complete = s.counts.total > 0 && s.counts.done === s.counts.total;
-    return `<${tokens[idx].tag} class="section-head${complete ? " sec-complete" : ""}" id="sec-${escapeHtml(s.id)}" data-section="${escapeHtml(s.id)}" data-level="${tokens[idx].tag.slice(1)}" data-line="${s.line ?? ""}"><span class="sec-title">`;
+    return `<${tokens[idx].tag} class="section-head" id="sec-${escapeHtml(s.id)}" data-section="${escapeHtml(s.id)}" data-level="${tokens[idx].tag.slice(1)}" data-line="${s.line ?? ""}"><span class="sec-title">`;
   };
   rules.heading_close = (tokens, idx, options, _env, self) => {
     const open = tokens[idx - 2];
     const s = open && open.meta && open.meta.section;
     if (!s) return self.renderToken(tokens, idx, options);
-    const c = s.counts;
+    const c = executionCounts(s.counts);
     const seg = (k) => (c[k] ? `<i class="seg seg-${k}" style="width:${(100 * c[k]) / c.total}%"></i>` : "");
-    const title = [`${c.done} of ${c.total} done`, c.in_progress ? `${c.in_progress} in progress` : "", c.blocked ? `${c.blocked} blocked` : "", c.question ? `${c.question} to decide` : ""].filter(Boolean).join(", ");
+    const title = [`${c.done} of ${c.total} actions done; excludes questions and cancelled work`, c.in_progress ? `${c.in_progress} in progress` : "", c.blocked ? `${c.blocked} blocked` : ""].filter(Boolean).join(", ");
     const progress =
-      c.total > 0
-        ? `<span class="sec-progress" title="${escapeHtml(title)}"><span class="sec-bar">${seg("done")}${seg("in_progress")}${seg("blocked")}${seg("question")}</span>${c.done}/${c.total}</span>`
+      c.total > 0 && tokens[idx].tag !== "h1"
+        ? `<span class="sec-progress" title="${escapeHtml(title)}"><span class="sec-bar">${seg("done")}${seg("in_progress")}${seg("blocked")}</span>${c.done}/${c.total} actions</span>`
         : "";
-    const done = c.total > 0 && c.done === c.total;
-    return `</span>${progress}</${tokens[idx].tag}>\n`.replace(/^<\/span>/, done ? '</span><span class="sec-done-mark" title="Everything in this section is done">✓</span>' : "</span>");
+    const questions = s.counts.question && tokens[idx].tag !== "h1" ? `<span class="sec-questions">${s.counts.question} to decide</span>` : "";
+    return `</span>${progress}${questions}</${tokens[idx].tag}>\n`;
   };
   rules.list_item_open = (tokens, idx, options, _env, self) => {
     const item = tokens[idx].meta && tokens[idx].meta.item;
     if (!item) return self.renderToken(tokens, idx, options);
     const status = item.status || "none";
     const label = item.status ? STATUS_LABEL[item.status] : "";
-    return `<li class="item status-${status}" data-item="${escapeHtml(item.id)}" data-status="${status}" data-line="${item.line ?? ""}"><span class="item-mark" role="img" aria-label="${escapeHtml(label)}" title="${escapeHtml(label)}"></span><div class="item-body">`;
+    const accessibility = item.status ? `role="img" aria-label="${escapeHtml(label)}" title="${escapeHtml(label)}"` : 'aria-hidden="true"';
+    return `<li class="item status-${status}" data-item="${escapeHtml(item.id)}" data-status="${status}" data-line="${item.line ?? ""}"><span class="item-mark" ${accessibility}></span><div class="item-body">`;
   };
   rules.list_item_close = (tokens, idx, options, _env, self) => {
     // find the matching open token to know whether we wrapped it
