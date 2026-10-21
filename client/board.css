@@ -2294,7 +2294,9 @@ body { font-size: 14px; -webkit-font-smoothing: antialiased; }
 .contents-link > span { display: block; font-weight: 500; }
 .contents-link small { opacity: .8; font-size: 10px; margin-top: 5px; }
 .contents-number { font-variant-numeric: tabular-nums; color: var(--muted); margin-right: 5px; }
-.contents-link.active { background: var(--paper); color: var(--ink); box-shadow: 0 1px 3px #19212d0a; }
+.contents-link.active, .contents-link.active:hover { background: var(--accent-soft); color: var(--accent); box-shadow: inset 4px 0 0 var(--accent), inset 0 0 0 1px var(--accent); }
+.contents-link.active > span { font-weight: 700; }
+.contents-link.active small { color: var(--ink); }
 .contents-link:hover { background: var(--accent-soft); }
 .board { background: var(--paper); padding: 24px 32px 80px; }
 .toolbar { background: var(--paper); border-bottom: 0; height: 38px; padding-right: 24px; }

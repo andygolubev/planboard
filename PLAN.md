@@ -11,7 +11,7 @@ that plots, supplies, and volunteer information are ready before registration op
 
 - [x] Map the planting beds and walking paths {#site-map}
 - [~] Prepare soil and label each planting bed {#site-soil}
-- [ ] Install a water station near the entrance {#site-water}
+- [ ] Install a water station near the entrance, with a working tap and a clearly marked refill sign {#site-water}
 
 ## Welcome volunteers {#volunteers}
 
@@ -22,7 +22,7 @@ that plots, supplies, and volunteer information are ready before registration op
 
 ## Planting day {#planting}
 
-- [ ] Pack seeds, gloves, and hand tools {#planting-supplies}
+- [ ] Pack seeds, gloves, and hand tools into labeled kits for each planting bed {#planting-supplies}
 - [!] Confirm the compost delivery date {#planting-compost}
 - [-] Build a greenhouse in the first season {#planting-greenhouse}
 

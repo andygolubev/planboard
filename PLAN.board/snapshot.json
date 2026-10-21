@@ -15,7 +15,7 @@
     {
       "id": "site-water",
       "status": "todo",
-      "text": "Install a water station near the entrance",
+      "text": "Install a water station near the entrance, with a working tap and a clearly marked refill sign",
       "section": "site"
     },
     {
@@ -45,7 +45,7 @@
     {
       "id": "planting-supplies",
       "status": "todo",
-      "text": "Pack seeds, gloves, and hand tools",
+      "text": "Pack seeds, gloves, and hand tools into labeled kits for each planting bed",
       "section": "planting"
     },
     {
