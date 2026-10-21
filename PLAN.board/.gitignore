@@ -1,3 +1,7 @@
 visits.json
 *.tmp
 whiteboards/
+workflow/writer.lock
+workflow/writer.guard
+workflow/snapshot.json
+workflow/journal.jsonl
