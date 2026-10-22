@@ -110,6 +110,8 @@ During an active review:
    `planboard set PLAN.md <item-id> done` after verifying it.
 4. Reply to every note with
    `planboard reply PLAN.md --to <note-id> "<answer>"`, then poll again.
+   Link each updated item, section, or diagram with `[label](#stable-id)` in
+   your reply so the user can jump to the change from Thread or Activity.
    Put detailed answers on the board; keep chat progress updates brief.
 5. On `waiting`, re-poll while the requested review is active, checking user
    steering between calls. On `replaced` or `closed`, stop polling. Exit 3
