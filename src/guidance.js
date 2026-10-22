@@ -123,7 +123,9 @@ export const WORKFLOW = `Review loop
      \`planboard set <PLAN.md> <item-id> <status>\` as work actually lands, and
      answer every note with \`planboard reply <PLAN.md> --to <note-id> "<answer>"\`
      (Markdown allowed; keep it short - the reply shows up next to the item on the
-     board). Then poll again. Do not narrate the same content in chat: the board
+     board). When describing a plan change, include a Markdown link to each updated
+     item, section, or diagram using its stable ID, e.g. [Water station](#site-water).
+     These links jump to the target from Thread or Activity. Then poll again. Do not narrate the same content in chat: the board
      is the conversation.
   4. Attachments: a note may carry screenshots the user pasted or a whiteboard
      sketch ("kind": "sketch"). Look at every attached image with your image
@@ -329,6 +331,7 @@ export function feedbackNextStep(planPath, notes) {
     `Handle every note (${ids}): read its thread, edit ${planPath} where the plan should change, ` +
     `flip statuses with \`planboard set ${planPath} <item-id> <status>\`, and reply to each with ` +
     `\`planboard reply ${planPath} --to <note-id> "<short answer>"\` so the answer appears next to the item. ` +
+    `Link each updated item, section, or diagram in your reply using [label](#stable-id), so the user can jump to the change from Thread or Activity. ` +
     (hints.length ? `Depth and attachments: ${hints.join("; ")}. ` : "") +
     `Then run \`planboard poll ${planPath} --owner "<your model>, effort <level>"\` again (Codex, Cursor, OpenCode: --timeout 30; collect any tracked command's output before re-polling). Do not repeat the answers in chat.`
   );

@@ -1,1 +1,25 @@
-[]
+[
+  {
+    "id": "n_da7g42",
+    "at": "2026-10-21T06:07:29.128Z",
+    "from": "user",
+    "anchor": {
+      "type": "board"
+    },
+    "text": "change something. i want to see the links of changes blocks and i want to click tclick them",
+    "state": "delivered",
+    "sent_at": "2026-10-21T06:08:02.069Z",
+    "delivered_at": "2026-10-21T06:09:11.130Z"
+  },
+  {
+    "id": "n_ggdaca",
+    "at": "2026-10-21T06:09:22.056Z",
+    "from": "agent",
+    "anchor": {
+      "type": "board"
+    },
+    "text": "I made two example edits so you can try the links:\n\n- [Water station](#site-water): added a working tap and a clearly marked refill sign.\n- [Planting supplies](#planting-supplies): changed this to labeled kits for each planting bed.\n\nClick either link to jump straight to the updated item in the plan. These are example wording changes; neither task is marked done.",
+    "state": "delivered",
+    "reply_to": "n_da7g42"
+  }
+]
